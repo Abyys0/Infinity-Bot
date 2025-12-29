@@ -623,6 +623,12 @@ async function handle(interaction) {
       });
     }
   }
-""  
-""  
-"  // confirmar_pagamento_multa_*" 
+
+  // Se chegou aqui, botão não reconhecido
+  await interaction.reply({
+    embeds: [createErrorEmbed('Botão Desconhecido', 'Este botão não é reconhecido.')],
+    flags: 64
+  });
+}
+
+module.exports = { handle }; 
