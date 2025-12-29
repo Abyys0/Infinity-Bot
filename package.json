@@ -1,0 +1,18 @@
+{
+  "name": "infinity-bot",
+  "version": "2.0.0",
+  "description": "Bot profissional de filas de apostado Free Fire - INFINITY BOT",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "keywords": ["discord", "bot", "free-fire", "apostado"],
+  "author": "Felipe",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.6.1"
+  }
+}

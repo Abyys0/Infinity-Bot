@@ -1,0 +1,2 @@
+# Este arquivo garante que a pasta data/ seja incluída no Git
+# Os arquivos de dados reais (.json, .txt) são ignorados pelo .gitignore
