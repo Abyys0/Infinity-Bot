@@ -517,32 +517,30 @@ module.exports = {
       embeds: [createSuccessEmbed('Fila Cancelada', `${EMOJIS.SUCCESS} A fila foi cancelada com sucesso.`)],
       flags: 64
     });
+  },
+
+  /**
+   * Cria fila a partir do painel fixo
+   */
+  async criarFilaPainel(interaction) {
+    // Extrair valor do customId (criar_fila_10 -> 10)
+    const valor = parseInt(interaction.customId.replace('criar_fila_', ''));
+
+    // Importar comando de fila para reutilizar a lógica
+    const filaCommand = require('../../commands/fila');
+    
+    // Simular execução do comando /fila
+    const mockInteraction = {
+      ...interaction,
+      options: {
+        getInteger: (name) => {
+          if (name === 'valor') return valor;
+          return null;
+        },
+        getString: () => null
+      }
+    };
+
+    await filaCommand.execute(mockInteraction);
   }
 };
-
-/**
- * Cria fila a partir do painel fixo
- */
-async function criarFilaPainel(interaction) {
-  // Extrair valor do customId (criar_fila_10 -> 10)
-  const valor = parseInt(interaction.customId.replace('criar_fila_', ''));
-
-  // Importar comando de fila para reutilizar a lógica
-  const filaCommand = require('../../commands/fila');
-  
-  // Simular execução do comando /fila
-  const mockInteraction = {
-    ...interaction,
-    options: {
-      getInteger: (name) => {
-        if (name === 'valor') return valor;
-        return null;
-      },
-      getString: () => null
-    }
-  };
-
-  await filaCommand.execute(mockInteraction);
-}
-
-module.exports = { handle, criarFilaPainel };
