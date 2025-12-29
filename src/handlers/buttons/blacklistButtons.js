@@ -157,7 +157,7 @@ async function handlePublico(interaction) {
 
   // blacklist_adicionar_publico - verificar se é analista
   if (customId === 'blacklist_adicionar_publico') {
-    // Verificar permissões
+    // Verificar permissões ANTES de qualquer resposta
     if (!await permissions.isAnalista(interaction.member) && !await permissions.isOwner(interaction.user.id, interaction.member)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Apenas analistas podem adicionar usuários à blacklist.')],

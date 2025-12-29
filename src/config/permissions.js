@@ -2,6 +2,25 @@
 
 const db = require('../database');
 
+// Cache de configuração (atualiza a cada 30 segundos)
+let configCache = null;
+let lastConfigFetch = 0;
+const CONFIG_CACHE_TTL = 30000; // 30 segundos
+
+async function getConfig() {
+  const now = Date.now();
+  if (!configCache || (now - lastConfigFetch) > CONFIG_CACHE_TTL) {
+    try {
+      configCache = await db.readData('config');
+      lastConfigFetch = now;
+    } catch (error) {
+      console.error('Erro ao carregar config:', error);
+      configCache = { roles: {}, taxes: {} };
+    }
+  }
+  return configCache;
+}
+
 /**
  * Verifica se o usuário tem cargo de dono
  */
@@ -36,7 +55,7 @@ async function hasRole(member, roleIds) {
  * Verifica se o usuário tem cargo de mediador
  */
 async function isMediador(member) {
-  const config = await db.readData('config');
+  const config = await getConfig();
   const mediadorRoles = config.roles?.mediador || [];
   return hasRole(member, mediadorRoles);
 }
@@ -45,7 +64,7 @@ async function isMediador(member) {
  * Verifica se o usuário tem cargo de analista
  */
 async function isAnalista(member) {
-  const config = await db.readData('config');
+  const config = await getConfig();
   const analistaRoles = config.roles?.analista || [];
   return hasRole(member, analistaRoles);
 }
