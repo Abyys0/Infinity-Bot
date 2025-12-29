@@ -680,3 +680,12 @@ async function handle(interaction) {
       });
     }
   }
+
+  // Se chegou aqui, modal não reconhecido
+  await interaction.reply({
+    embeds: [createErrorEmbed('Modal Desconhecido', 'Este modal não é reconhecido.')],
+    flags: 64
+  });
+}
+
+module.exports = { handle };
