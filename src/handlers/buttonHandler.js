@@ -28,6 +28,11 @@ async function handleButton(interaction) {
       return await queueButtons.handle(interaction);
     }
 
+    // Botão de criar fila do painel fixo
+    if (customId.startsWith('criar_fila_')) {
+      return await queueButtons.criarFilaPainel(interaction);
+    }
+
     // Botões de ticket
     if (customId.startsWith('ticket_')) {
       return await ticketButtons.handle(interaction);

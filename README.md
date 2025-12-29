@@ -105,7 +105,7 @@ infinity-bot/
 
 ## 👨‍💻 Desenvolvido por
 
-Felipe - 2025
+Abbys - 2025
 
 ---
 **INFINITY BOT** - Sistema profissional de apostado Free Fire
