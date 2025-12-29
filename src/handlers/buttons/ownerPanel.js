@@ -15,7 +15,7 @@ async function handle(interaction) {
   if (!await permissions.isOwner(interaction.user.id, interaction.member)) {
     return interaction.reply({
       embeds: [createErrorEmbed('Sem Permissão', 'Apenas o dono pode usar este painel.')],
-      ephemeral: true
+      flags: 64
     });
   }
 
@@ -271,7 +271,7 @@ async function handle(interaction) {
 
   // owner_view_config
   if (customId === 'owner_view_config') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     let config;
     try {
@@ -314,7 +314,7 @@ async function handle(interaction) {
 
   // owner_view_mediadores
   if (customId === 'owner_view_mediadores') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     const mediadores = await getActiveMediadores();
 

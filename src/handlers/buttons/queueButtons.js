@@ -159,7 +159,7 @@ module.exports = {
 
     await interaction.reply({
       content: '❌ Botão não reconhecido.',
-      ephemeral: true
+      flags: 64
     });
   },
 
@@ -175,21 +175,21 @@ module.exports = {
     if (!fila) {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Não Encontrada', 'Esta fila não existe mais.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.status === 'confirmada') {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Confirmada', 'Esta fila já foi confirmada!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.status === 'cancelada') {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Cancelada', 'Esta fila foi cancelada.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -197,7 +197,7 @@ module.exports = {
     if (!fila.time1.includes(interaction.user.id)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Não Autorizado', 'Você não faz parte do Time 1 (Gelo Infinito)!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -205,7 +205,7 @@ module.exports = {
     if (fila.confirmacoesTime1?.includes(interaction.user.id)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Já Confirmado', 'Você já confirmou sua participação!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -234,7 +234,7 @@ module.exports = {
           'Confirmado',
           `${EMOJIS.SUCCESS} Você confirmou sua participação!\n\n**Todos confirmaram!** ${resultado.pixInfo ? 'Informações de pagamento enviadas no canal.' : 'Configure o PIX no painel do dono.'}`
         )],
-        ephemeral: true
+        flags: 64
       });
     } else {
       await interaction.reply({
@@ -242,7 +242,7 @@ module.exports = {
           'Confirmado',
           `${EMOJIS.SUCCESS} Você confirmou sua participação!\n\n**Aguardando:** ${fila.time1.length + fila.time2.length - confirmacoesTime1.length - (fila.confirmacoesTime2?.length || 0)} jogador(es)`
         )],
-        ephemeral: true
+        flags: 64
       });
     }
   },
@@ -259,21 +259,21 @@ module.exports = {
     if (!fila) {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Não Encontrada', 'Esta fila não existe mais.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.status === 'confirmada') {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Confirmada', 'Esta fila já foi confirmada!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.status === 'cancelada') {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Cancelada', 'Esta fila foi cancelada.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -281,7 +281,7 @@ module.exports = {
     if (!fila.time2.includes(interaction.user.id)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Não Autorizado', 'Você não faz parte do Time 2 (Gelo Normal)!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -289,7 +289,7 @@ module.exports = {
     if (fila.confirmacoesTime2?.includes(interaction.user.id)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Já Confirmado', 'Você já confirmou sua participação!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -318,7 +318,7 @@ module.exports = {
           'Confirmado',
           `${EMOJIS.SUCCESS} Você confirmou sua participação!\n\n**Todos confirmaram!** ${resultado.pixInfo ? 'Informações de pagamento enviadas no canal.' : 'Configure o PIX no painel do dono.'}`
         )],
-        ephemeral: true
+        flags: 64
       });
     } else {
       await interaction.reply({
@@ -326,7 +326,7 @@ module.exports = {
           'Confirmado',
           `${EMOJIS.SUCCESS} Você confirmou sua participação!\n\n**Aguardando:** ${fila.time1.length + fila.time2.length - (fila.confirmacoesTime1?.length || 0) - confirmacoesTime2.length} jogador(es)`
         )],
-        ephemeral: true
+        flags: 64
       });
     }
   },
@@ -342,7 +342,7 @@ module.exports = {
     if (!fila) {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Não Encontrada', 'Esta fila não existe mais.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -353,14 +353,14 @@ module.exports = {
     if (!isMediador) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores podem confirmar o pagamento.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.pagamentoConfirmado) {
       return interaction.reply({
         embeds: [createErrorEmbed('Já Confirmado', 'O pagamento desta fila já foi confirmado!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -418,14 +418,14 @@ module.exports = {
           'Pagamento Confirmado',
           `${EMOJIS.SUCCESS} Pagamento confirmado e canal renomeado para **${novoNome}**`
         )],
-        ephemeral: true
+        flags: 64
       });
 
     } catch (error) {
       console.error('Erro ao renomear canal:', error);
       await interaction.reply({
         embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao processar a confirmação.')],
-        ephemeral: true
+        flags: 64
       });
     }
   },
@@ -441,21 +441,21 @@ module.exports = {
     if (!fila) {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Não Encontrada', 'Esta fila não existe mais.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.status === 'confirmada' || fila.status === 'finalizada') {
       return interaction.reply({
         embeds: [createErrorEmbed('Não Cancelável', 'Esta fila já foi confirmada ou finalizada!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.status === 'cancelada') {
       return interaction.reply({
         embeds: [createErrorEmbed('Já Cancelada', 'Esta fila já foi cancelada.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -466,7 +466,7 @@ module.exports = {
     if (fila.criadoPor !== interaction.user.id && !isStaff) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Apenas o criador da fila ou staff pode cancelá-la.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -515,7 +515,7 @@ module.exports = {
 
     await interaction.reply({
       embeds: [createSuccessEmbed('Fila Cancelada', `${EMOJIS.SUCCESS} A fila foi cancelada com sucesso.`)],
-      ephemeral: true
+      flags: 64
     });
   }
 };

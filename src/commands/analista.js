@@ -27,7 +27,7 @@ module.exports = {
     if (!await permissions.isAnalista(interaction.member)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Você não tem o cargo de analista.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -45,7 +45,7 @@ module.exports = {
             'Já em Serviço',
             `Você já está em serviço como **Analista ${analista.tipo === ANALYST_TYPES.MOBILE ? 'Mobile' : 'Emulador'}**!\n\nSaia de serviço antes de trocar de tipo.`
           )],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -80,7 +80,7 @@ module.exports = {
           'Em Serviço',
           `${EMOJIS.ONLINE} **Você entrou em serviço!**\n\n${tipoEmoji} **Tipo:** Analista ${tipoNome}\n\nVocê receberá chamados de SS ${tipoNome}!`
         )],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -88,7 +88,7 @@ module.exports = {
       if (!analista || !analista.onDuty) {
         return interaction.reply({
           embeds: [createErrorEmbed('Não em Serviço', 'Você não está em serviço!')],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -108,7 +108,7 @@ module.exports = {
           'Fora de Serviço',
           `${EMOJIS.OFFLINE} **Você saiu de serviço!**\n\nObrigado pelo trabalho!`
         )],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -119,7 +119,7 @@ module.exports = {
             'Status de Analista',
             `${EMOJIS.OFFLINE} Você nunca entrou em serviço como analista.\n\nUse \`/analista entrar_mobile\` ou \`/analista entrar_emulador\`.`
           )],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -140,7 +140,7 @@ module.exports = {
 
       await interaction.reply({
         embeds: [embed],
-        ephemeral: true
+        flags: 64
       });
     }
   }

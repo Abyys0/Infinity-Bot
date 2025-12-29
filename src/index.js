@@ -10,6 +10,9 @@ const { handleMessage } = require('./handlers/messageHandler');
 const { startMediatorRenewalChecker } = require('./services/mediadorService');
 const logger = require('./utils/logger');
 
+// Iniciar servidor HTTP para Render (keep-alive)
+require('../server');
+
 // Validação de variáveis de ambiente
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ ERRO: Token do Discord não encontrado no arquivo .env');

@@ -55,7 +55,7 @@ module.exports = {
     if (!await permissions.isAnalista(interaction.member) && !await permissions.isOwner(interaction.user.id, interaction.member)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Apenas analistas podem gerenciar a blacklist.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -67,7 +67,7 @@ module.exports = {
       if (await permissions.isBlacklisted(user.id)) {
         return interaction.reply({
           embeds: [createErrorEmbed('Já na Blacklist', `${user.tag} já está na blacklist.`)],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -98,7 +98,7 @@ module.exports = {
       if (!await permissions.isBlacklisted(user.id)) {
         return interaction.reply({
           embeds: [createErrorEmbed('Não Encontrado', `${user.tag} não está na blacklist.`)],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -127,7 +127,7 @@ module.exports = {
             'Não Encontrado',
             `${EMOJIS.SUCCESS} **${user.tag}** não está na blacklist.`
           )],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -135,7 +135,7 @@ module.exports = {
 
       await interaction.reply({
         embeds: [embed],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -145,7 +145,7 @@ module.exports = {
       if (blacklist.length === 0) {
         return interaction.reply({
           embeds: [createSuccessEmbed('Blacklist Vazia', 'Não há usuários na blacklist.')],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -177,7 +177,7 @@ module.exports = {
 
       await interaction.reply({
         embeds: [embed],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -221,7 +221,7 @@ module.exports = {
       await interaction.reply({
         embeds: [embed],
         components: [row],
-        ephemeral: true
+        flags: 64
       });
     }
   }

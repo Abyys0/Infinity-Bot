@@ -29,7 +29,7 @@ module.exports = {
     if (!await permissions.isMediadorOrAbove(interaction.member)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores e superiores podem chamar analistas para SS.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -51,7 +51,7 @@ module.exports = {
           'Nenhum Analista Disponível',
           `Não há analistas ${tipoNome} em serviço no momento.\n\n${EMOJIS.INFO} Peça para um analista entrar em serviço com \`/analista entrar_${tipo}\`.`
         )],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -88,7 +88,7 @@ module.exports = {
       console.error('Erro ao chamar analista:', error);
       return interaction.reply({
         embeds: [createErrorEmbed('Erro', 'Não foi possível chamar o analista.')],
-        ephemeral: true
+        flags: 64
       });
     }
   }

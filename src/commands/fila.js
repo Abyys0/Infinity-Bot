@@ -67,7 +67,7 @@ module.exports = {
 
   async execute(interaction) {
     // Responder imediatamente para evitar timeout
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
 
     const tipo = interaction.options.getString('tipo');
     const plataforma = interaction.options.getString('plataforma');

@@ -32,11 +32,11 @@ module.exports = {
           'Blacklist',
           `${EMOJIS.BLACKLIST} Você está na blacklist e não pode abrir tickets.\n\n**Motivo:** ${entry.reason}\n**Adicionado por:** <@${entry.addedBy}>\n**Data:** ${new Date(entry.addedAt).toLocaleString('pt-BR')}`
         )],
-        ephemeral: true
+        flags: 64
       });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
 
     const tipo = interaction.options.getString('tipo');
     const assunto = interaction.options.getString('assunto') || 'Não informado';

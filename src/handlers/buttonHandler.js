@@ -59,7 +59,7 @@ async function handleButton(interaction) {
       if (!await permissions.canCallSS(interaction.member)) {
         return interaction.reply({
           embeds: [createErrorEmbed('Sem Permissão', 'Você não tem permissão para chamar analista.')],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -75,7 +75,7 @@ async function handleButton(interaction) {
     // Botão não reconhecido
     await interaction.reply({
       content: '❌ Botão não reconhecido.',
-      ephemeral: true
+      flags: 64
     });
 
   } catch (error) {

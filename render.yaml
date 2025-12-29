@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: infinity-bot
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: CLIENT_ID
+        sync: false
+      - key: GUILD_ID
+        sync: false
+      - key: OWNER_ID
+        sync: false
+      - key: PORT
+        value: 3000
+    healthCheckPath: /ping
+    autoDeploy: true

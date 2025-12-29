@@ -291,7 +291,7 @@ module.exports = {
         embedInfo,
         embedDicas
       ], 
-      ephemeral: true 
+      flags: 64 
     });
   }
 };

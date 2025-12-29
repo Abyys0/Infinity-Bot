@@ -8,11 +8,17 @@
     "dev": "node --watch src/index.js",
     "deploy": "node deploy-commands.js"
   },
-  "keywords": ["discord", "bot", "free-fire", "apostado"],
+  "keywords": [
+    "discord",
+    "bot",
+    "free-fire",
+    "apostado"
+  ],
   "author": "Felipe",
   "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
-    "dotenv": "^16.6.1"
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1"
   }
 }

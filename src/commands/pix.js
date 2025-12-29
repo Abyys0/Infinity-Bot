@@ -26,7 +26,7 @@ module.exports = {
     if (!await permissions.isMediador(interaction.member)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores podem usar este comando.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -38,7 +38,7 @@ module.exports = {
           'Canal Incorreto',
           `Este comando só pode ser usado em <#${config.channels.pix}>`
         )],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -52,7 +52,7 @@ module.exports = {
           'Chave PIX Inválida',
           'A chave PIX informada não é válida.\nFormatos aceitos: CPF, CNPJ, email, telefone ou chave aleatória.'
         )],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -83,7 +83,7 @@ module.exports = {
         'PIX Configurado',
         `${EMOJIS.PIX} **PIX configurado com sucesso!**\n\n**Nome:** ${nome}\n**Chave:** ${chave}`
       )],
-      ephemeral: true
+      flags: 64
     });
   }
 };

@@ -25,7 +25,7 @@ module.exports = {
     if (!await permissions.isMediador(interaction.member)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Você não tem o cargo de mediador.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -36,7 +36,7 @@ module.exports = {
     if (!mediador) {
       return interaction.reply({
         embeds: [createErrorEmbed('Erro', 'Você não está registrado como mediador no sistema.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -44,7 +44,7 @@ module.exports = {
       if (mediador.onDuty) {
         return interaction.reply({
           embeds: [createErrorEmbed('Já em Serviço', 'Você já está em serviço!')],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -58,14 +58,14 @@ module.exports = {
           'Em Serviço',
           `${EMOJIS.ONLINE} **Você entrou em serviço como mediador!**\n\nBoa sorte nos atendimentos!`
         )],
-        ephemeral: true
+        flags: 64
       });
 
     } else if (acao === 'sair') {
       if (!mediador.onDuty) {
         return interaction.reply({
           embeds: [createErrorEmbed('Não em Serviço', 'Você não está em serviço!')],
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -79,7 +79,7 @@ module.exports = {
           'Fora de Serviço',
           `${EMOJIS.OFFLINE} **Você saiu de serviço!**\n\nObrigado pelo trabalho!`
         )],
-        ephemeral: true
+        flags: 64
       });
 
     } else if (acao === 'status') {
@@ -95,7 +95,7 @@ module.exports = {
 
       await interaction.reply({
         embeds: [embed],
-        ephemeral: true
+        flags: 64
       });
     }
   }

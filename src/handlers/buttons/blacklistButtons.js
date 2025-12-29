@@ -13,7 +13,7 @@ async function handle(interaction) {
   if (!await permissions.isAnalista(interaction.member) && !await permissions.isOwner(interaction.user.id, interaction.member)) {
     return interaction.reply({
       embeds: [createErrorEmbed('Sem Permissão', 'Apenas analistas podem gerenciar a blacklist.')],
-      ephemeral: true
+      flags: 64
     });
   }
 
@@ -87,7 +87,7 @@ async function handle(interaction) {
 
   // blacklist_list
   if (customId === 'blacklist_list') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     const blacklist = await db.readData('blacklist');
 
@@ -161,7 +161,7 @@ async function handlePublico(interaction) {
     if (!await permissions.isAnalista(interaction.member) && !await permissions.isOwner(interaction.user.id, interaction.member)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Apenas analistas podem adicionar usuários à blacklist.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -193,7 +193,7 @@ async function handlePublico(interaction) {
 
   // blacklist_listar_publico
   if (customId === 'blacklist_listar_publico') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     const blacklist = await db.readData('blacklist');
 

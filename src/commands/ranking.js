@@ -23,7 +23,7 @@ module.exports = {
     if (sortedRanking.length === 0) {
       return interaction.reply({
         content: '📊 Nenhum dado de ranking disponível ainda.',
-        ephemeral: true
+        flags: 64
       });
     }
 

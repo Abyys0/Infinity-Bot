@@ -41,7 +41,7 @@ module.exports = {
     if (!await permissions.isMediadorOrAbove(interaction.member)) {
       return interaction.reply({
         embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores e superiores podem finalizar filas.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -57,21 +57,21 @@ module.exports = {
     if (!fila) {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Não Encontrada', `Não foi encontrada nenhuma fila com ID \`${filaId}\`.`)],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.status === 'finalizada') {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Finalizada', 'Esta fila já foi finalizada!')],
-        ephemeral: true
+        flags: 64
       });
     }
 
     if (fila.status !== 'confirmada') {
       return interaction.reply({
         embeds: [createErrorEmbed('Fila Não Confirmada', 'Esta fila ainda não foi confirmada! Aguarde a confirmação antes de finalizar.')],
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -227,7 +227,7 @@ module.exports = {
 
       await interaction.followUp({
         embeds: [pagamentoEmbed],
-        ephemeral: true
+        flags: 64
       });
     }
   }
