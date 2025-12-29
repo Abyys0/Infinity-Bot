@@ -514,6 +514,169 @@ async function handle(interaction) {
       });
     }
   }
-}
 
-module.exports = { handle };
+  // modal_owner_multar_mediador
+  if (customId === 'modal_owner_multar_mediador') {
+    const userId = interaction.fields.getTextInputValue('user_id').trim();
+    const valor = parseFloat(interaction.fields.getTextInputValue('valor').trim());
+    const motivo = interaction.fields.getTextInputValue('motivo').trim();
+
+    const { isValidDiscordId } = require('../../utils/validators');
+
+    // Validar ID
+    if (!isValidDiscordId(userId)) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('ID Inválido', 'O ID do usuário é inválido.')],
+        flags: 64
+      });
+    }
+
+    // Validar valor
+    if (isNaN(valor) || valor <= 0) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Valor Inválido', 'O valor da multa deve ser um número positivo.')],
+        flags: 64
+      });
+    }
+
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      // Buscar usuário
+      const user = await interaction.client.users.fetch(userId).catch(() => null);
+      if (!user) {
+        return interaction.editReply({
+          embeds: [createErrorEmbed('Usuário Não Encontrado', 'Não foi possível encontrar o usuário com este ID.')]
+        });
+      }
+
+      // Verificar se já tem multa pendente
+      const multas = await db.readData('multas');
+      const multaPendente = multas.find(m => m.userId === userId && m.status === 'pendente');
+
+      if (multaPendente) {
+        return interaction.editReply({
+          embeds: [createErrorEmbed('Multa Pendente', `${user.tag} já possui uma multa pendente de R$ ${multaPendente.valor}.`)]
+        });
+      }
+
+      // Criar canal privado de multa
+      const { PermissionFlagsBits, ChannelType } = require('discord.js');
+      const canalMulta = await interaction.guild.channels.create({
+        name: `multa-${user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          {
+            id: interaction.guild.id,
+            deny: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: userId,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles]
+          },
+          ...process.env.OWNER_ID.split(',').map(roleId => roleId.trim()).filter(id => id).map(roleId => ({
+            id: roleId,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels]
+          }))
+        ]
+      });
+
+      // Criar registro da multa
+      const multaId = `multa_${Date.now()}_${userId}`;
+      const novaMulta = {
+        id: multaId,
+        userId,
+        valor,
+        motivo,
+        status: 'pendente',
+        canalId: canalMulta.id,
+        criadaEm: Date.now(),
+        criadaPor: interaction.user.id
+      };
+
+      multas.push(novaMulta);
+      await db.writeData('multas', multas);
+
+      // Remover mediador da fila de trabalho se estiver
+      const mediadores = await db.readData('mediadores');
+      const mediador = mediadores.find(m => m.userId === userId);
+      if (mediador && mediador.onDuty) {
+        await db.updateItem('mediadores',
+          m => m.userId === userId,
+          m => ({ ...m, onDuty: false })
+        );
+      }
+
+      // Enviar mensagem no canal de multa
+      const embedMulta = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle('💸 Multa Aplicada')
+        .setDescription(
+          `**${user}**, você recebeu uma multa e precisa pagá-la para voltar a trabalhar.\n\n` +
+          `**💰 Valor:** R$ ${valor}\n` +
+          `**📝 Motivo:** ${motivo}\n\n` +
+          `⚠️ **Restrições ativas:**\n` +
+          `• Não pode atender tickets\n` +
+          `• Não pode entrar na fila de trabalho\n` +
+          `• Não pode participar de filas\n\n` +
+          `💳 **Como pagar:**\n` +
+          `Envie o comprovante de pagamento neste canal e aguarde a confirmação do dono.\n\n` +
+          `**Aplicada por:** ${interaction.user}\n` +
+          `**Data:** ${new Date().toLocaleString('pt-BR')}`
+        )
+        .setTimestamp();
+
+      const botaoConfirmar = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`confirmar_pagamento_multa_${multaId}`)
+            .setLabel('Confirmar Pagamento')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅')
+        );
+
+      await canalMulta.send({
+        content: `${user}`,
+        embeds: [embedMulta],
+        components: [botaoConfirmar]
+      });
+
+      // Notificar usuário via DM
+      try {
+        await user.send({
+          embeds: [new EmbedBuilder()
+            .setColor(COLORS.ERROR)
+            .setTitle('💸 Você Recebeu uma Multa')
+            .setDescription(
+              `**Valor:** R$ ${valor}\n` +
+              `**Motivo:** ${motivo}\n\n` +
+              `Acesse o canal <#${canalMulta.id}> para pagar.`
+            )]
+        });
+      } catch (error) {
+        console.log('Não foi possível enviar DM para o usuário.');
+      }
+
+      // Log
+      await logger.logAction(
+        interaction.client,
+        'MULTA_APLICADA',
+        `${interaction.user.tag} multou ${user.tag} em R$ ${valor} - Motivo: ${motivo}`
+      );
+
+      await interaction.editReply({
+        embeds: [createSuccessEmbed(
+          'Multa Aplicada',
+          `${EMOJIS.SUCCESS} **${user.tag}** foi multado em **R$ ${valor}**!\n\n` +
+          `📝 Canal criado: <#${canalMulta.id}>\n` +
+          `🚫 O usuário está bloqueado de trabalhar até pagar a multa.`
+        )]
+      });
+
+    } catch (error) {
+      console.error('Erro ao aplicar multa:', error);
+      await interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao aplicar a multa.')]
+      });
+    }
+  }

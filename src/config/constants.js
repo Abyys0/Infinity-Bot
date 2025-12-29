@@ -67,7 +67,8 @@ const QUEUE_TYPES = {
 const PLATFORMS = {
   MOBILE: 'mobile',
   EMULATOR: 'emulador',
-  MIXED: 'misto'
+  MIXED: 'misto',
+  TACTICAL: 'tatico'
 };
 
 // Tipos de analista

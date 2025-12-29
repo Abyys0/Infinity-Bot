@@ -41,6 +41,25 @@ module.exports = {
     }
 
     if (acao === 'entrar') {
+      // Verificar se tem multa pendente
+      const { temMultaPendente, getMultaPendente } = require('../services/multaService');
+      const temMulta = await temMultaPendente(interaction.user.id);
+      
+      if (temMulta) {
+        const multa = await getMultaPendente(interaction.user.id);
+        return interaction.reply({
+          embeds: [createErrorEmbed(
+            '🚫 Multa Pendente',
+            `Você não pode entrar em serviço pois tem uma multa pendente!\n\n` +
+            `**💰 Valor:** R$ ${multa.valor}\n` +
+            `**📝 Motivo:** ${multa.motivo}\n` +
+            `**📍 Canal:** <#${multa.canalId}>\n\n` +
+            `Pague a multa para voltar a trabalhar.`
+          )],
+          flags: 64
+        });
+      }
+
       if (mediador.onDuty) {
         return interaction.reply({
           embeds: [createErrorEmbed('Já em Serviço', 'Você já está em serviço!')],

@@ -10,6 +10,7 @@ const ticketButtons = require('./buttons/ticketButtons');
 const ssButtons = require('./buttons/ssButtons');
 const renewalButtons = require('./buttons/renewalButtons');
 const blacklistButtons = require('./buttons/blacklistButtons');
+const multasButtons = require('./buttons/multasButtons');
 
 /**
  * Processa cliques em botões
@@ -75,6 +76,11 @@ async function handleButton(interaction) {
     // Botão de criar ticket do painel fixo
     if (customId === 'criar_ticket_painel') {
       return await ticketButtons.criarTicketPainel(interaction);
+    }
+
+    // Botão de confirmar pagamento de multa
+    if (customId.startsWith('confirmar_pagamento_multa_')) {
+      return await multasButtons.confirmarPagamentoMulta(interaction);
     }
 
     // Botão não reconhecido

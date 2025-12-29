@@ -527,6 +527,102 @@ async function handle(interaction) {
 
     return await interaction.showModal(modal);
   }
-}
 
-module.exports = { handle };
+  // owner_multar_mediador
+  if (customId === 'owner_multar_mediador') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_owner_multar_mediador')
+      .setTitle('Multar Mediador');
+
+    const userInput = new TextInputBuilder()
+      .setCustomId('user_id')
+      .setLabel('ID do Usuário')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('123456789012345678')
+      .setRequired(true);
+
+    const valorInput = new TextInputBuilder()
+      .setCustomId('valor')
+      .setLabel('Valor da Multa (R$)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('50')
+      .setRequired(true);
+
+    const motivoInput = new TextInputBuilder()
+      .setCustomId('motivo')
+      .setLabel('Motivo da Multa')
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder('Descreva o motivo da multa...')
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(userInput),
+      new ActionRowBuilder().addComponents(valorInput),
+      new ActionRowBuilder().addComponents(motivoInput)
+    );
+
+    return await interaction.showModal(modal);
+  }
+
+  // owner_ver_multas
+  if (customId === 'owner_ver_multas') {
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      const multas = await db.readData('multas');
+
+      if (multas.length === 0) {
+        return interaction.editReply({
+          embeds: [createInfoEmbed('📊 Multas', 'Nenhuma multa registrada.')]
+        });
+      }
+
+      // Separar multas pagas e pendentes
+      const multasPendentes = multas.filter(m => m.status === 'pendente');
+      const multasPagas = multas.filter(m => m.status === 'paga');
+
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.WARNING)
+        .setTitle('💸 Relatório de Multas')
+        .setTimestamp();
+
+      // Multas pendentes
+      if (multasPendentes.length > 0) {
+        const listaPendentes = multasPendentes.map(m => 
+          `**<@${m.userId}>** - R$ ${m.valor}\n` +
+          `📝 ${m.motivo}\n` +
+          `📅 ${new Date(m.criadaEm).toLocaleString('pt-BR')}\n` +
+          `🔗 Canal: <#${m.canalId}>`
+        ).join('\n\n');
+
+        embed.addFields({
+          name: `⚠️ Pendentes (${multasPendentes.length})`,
+          value: listaPendentes.substring(0, 1024)
+        });
+      }
+
+      // Multas pagas
+      if (multasPagas.length > 0) {
+        const listaPagas = multasPagas.slice(0, 5).map(m =>
+          `**<@${m.userId}>** - R$ ${m.valor} ✅\n` +
+          `📅 Paga em ${new Date(m.pagaEm).toLocaleString('pt-BR')}`
+        ).join('\n\n');
+
+        embed.addFields({
+          name: `✅ Pagas (${multasPagas.length})`,
+          value: listaPagas.substring(0, 1024)
+        });
+      }
+
+      await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+      console.error('Erro ao buscar multas:', error);
+      await interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao buscar as multas.')]
+      });
+    }
+  }
+""  
+""  
+"  // confirmar_pagamento_multa_*" 

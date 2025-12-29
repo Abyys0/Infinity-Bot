@@ -111,7 +111,17 @@ module.exports = {
           .setCustomId('owner_remove_mediador')
           .setLabel('Remover Mediador')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji(EMOJIS.ERROR)
+          .setEmoji(EMOJIS.ERROR),
+        new ButtonBuilder()
+          .setCustomId('owner_multar_mediador')
+          .setLabel('Multar Mediador')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('💸'),
+        new ButtonBuilder()
+          .setCustomId('owner_ver_multas')
+          .setLabel('Ver Multas')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('📊')
       );
 
     await interaction.editReply({
