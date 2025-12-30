@@ -30,13 +30,25 @@ module.exports = {
 
     // Criar embed do painel
     const embed = new EmbedBuilder()
-      .setTitle('SUPORTE ZE')
+      .setTitle(`${EMOJIS.TICKET} Sistema de Tickets - Suporte`)
       .setDescription(
-        'Seja bem-vindo(a) ao quadro de tickets, aqui você pode solicitar suporte para a administração do servidor! Assim que aberto, a equipe de atendimento irá te ajudar o mais rápido possível!'
+        '**Precisa de ajuda ou suporte?**\n\n' +
+        `${EMOJIS.INFO} Selecione uma categoria abaixo para abrir um ticket.\n\n` +
+        `${EMOJIS.TICKET} **O que são tickets?**\n` +
+        'Tickets são canais privados onde você pode:\n' +
+        '• Tirar dúvidas sobre o sistema\n' +
+        '• Reportar problemas\n' +
+        '• Solicitar ajuda da equipe\n' +
+        '• Fazer reclamações ou sugestões\n\n' +
+        `${EMOJIS.WARNING} **Importante:**\n` +
+        '• Apenas você e a equipe verão o ticket\n' +
+        '• Seja claro e objetivo\n' +
+        '• Aguarde o atendimento da equipe\n\n' +
+        `${EMOJIS.SUCCESS} Nossa equipe responderá o mais rápido possível!`
       )
       .setColor(COLORS.PRIMARY)
-      .setImage('https://i.imgur.com/YourImageURL.png') // Substitua pela URL da sua imagem "ABRA SEU TICKET"
-      .setFooter({ text: 'Acabou de ler? Confira #🍀 • chat-geral.' });
+      .setTimestamp()
+      .setFooter({ text: 'INFINITY BOT • Sistema de Suporte' });
 
     // Menu de seleção para escolher categoria
     const row = new ActionRowBuilder()
