@@ -133,8 +133,23 @@ module.exports = {
       .setDescription('**Para membros com cargo de mediador ou superior**')
       .addFields(
         {
-          name: '`/fila <tipo> <plataforma> <valor> [jogadores...]`',
-          value: '**Descrição:** Cria uma fila de apostado\n**Uso:** `/fila tipo:2x2 plataforma:mobile valor:10 jogador1:@user1 jogador2:@user2...`\n**Onde:** Qualquer canal\n**Tipos:** 1x1, 2x2, 3x3, 4x4\n**Plataformas:** Mobile, Emulador, Misto\n**Nota:** Cria canal privado e divide em 2 times automaticamente',
+          name: '`/fila <tipo> <plataforma> <valor>`',
+          value: '**Descrição:** Cria uma fila de apostado no canal atual\n**Uso:** `/fila tipo:1x1 plataforma:mobile valor:10`\n**Onde:** Canal de filas\n**Tipos:** 1x1, 2x2, 3x3, 4x4\n**Plataformas:** Mobile, Emulador, Misto, Tático\n**Nota:** Jogadores entram clicando no botão, divide em times automaticamente quando completar',
+          inline: false
+        },
+        {
+          name: '`/painelfila <canal>`',
+          value: '**Descrição:** Cria painel fixo de criação de filas\n**Uso:** `/painelfila canal:#1v1-mobile`\n**Onde:** Qualquer canal\n**Efeito:** Cria painel com botões para cada valor configurado\n**Nota:** Jogadores clicam no valor desejado para criar fila',
+          inline: false
+        },
+        {
+          name: '`/painelmediador <canal>`',
+          value: '**Descrição:** Cria painel fixo para mediadores entrarem/sairem de serviço\n**Uso:** `/painelmediador canal:#fila-mediadores`\n**Onde:** Canal de staff\n**Botões:** Entrar em Serviço, Sair de Serviço, Ver Mediadores\n**Nota:** Substitui o uso de `/mediador entrar/sair`',
+          inline: false
+        },
+        {
+          name: '`/painelanalista <canal>`',
+          value: '**Descrição:** Cria painel fixo para chamar analistas\n**Uso:** `/painelanalista canal:#staff`\n**Onde:** Canal de staff\n**Botões:** Chamar Analista Mobile, Chamar Analista Emulador\n**Nota:** Substitui o uso de `/ss`',
           inline: false
         },
         {
@@ -204,6 +219,16 @@ module.exports = {
           inline: false
         },
         {
+          name: '`/painelticket <canal>`',
+          value: '**Descrição:** Cria painel fixo para abrir tickets\n**Uso:** `/painelticket canal:#suporte`\n**Onde:** Qualquer canal\n**Botões:** Suporte, Vagas\n**Nota:** Qualquer pessoa pode clicar para abrir ticket',
+          inline: false
+        },
+        {
+          name: '`/painelblacklistpublico <canal>`',
+          value: '**Descrição:** Cria painel público de blacklist\n**Uso:** `/painelblacklistpublico canal:#regras`\n**Onde:** Qualquer canal\n**Botões:** Consultar Usuário, Adicionar (analistas), Ver Lista\n**Nota:** Consultar e Ver são públicos, Adicionar apenas para analistas',
+          inline: false
+        },
+        {
           name: '`/ranking [usuario]`',
           value: '**Descrição:** Mostra o ranking de apostados\n**Uso:** `/ranking` (seu ranking) ou `/ranking usuario:@user` (de alguém)\n**Onde:** Qualquer canal\n**Exibe:** Vitórias, derrotas, total de jogos, taxa de vitória',
           inline: false
@@ -221,8 +246,13 @@ module.exports = {
       .setTitle(`${EMOJIS.INFO} Informações Importantes`)
       .addFields(
         {
+          name: '📋 Painéis Fixos',
+          value: '• **Painéis** são mensagens permanentes com botões\n• Facilitam o uso - não precisa digitar comandos\n• Apenas donos/mediadores podem criar painéis\n• Tipos: Filas, Tickets, Mediadores, Analistas, Blacklist',
+          inline: false
+        },
+        {
           name: '🎮 Sistema de Filas',
-          value: '• Filas são criadas em canais privados\n• Jogadores são divididos em 2 times automaticamente\n• Todos devem confirmar participação\n• Apenas criador ou staff pode cancelar\n• Apenas mediador+ pode finalizar',
+          value: '• Filas aparecem no mesmo canal (não cria canal novo)\n• Jogadores entram clicando em "Entrar na Fila"\n• Divide em 2 times automaticamente quando completar\n• Sistema de confirmação com botões Gelo Infinito/Normal\n• Verifica multas e blacklist antes de entrar',
           inline: false
         },
         {
@@ -232,7 +262,7 @@ module.exports = {
         },
         {
           name: '🚫 Sistema de Blacklist',
-          value: '• Usuários na blacklist não podem:\n  - Participar de filas\n  - Abrir tickets\n• Staff pode adicionar/remover',
+          value: '• Usuários na blacklist não podem:\n  - Participar de filas\n  - Abrir tickets\n• Staff pode adicionar/remover\n• Painel público permite consultar',
           inline: false
         },
         {
@@ -242,12 +272,22 @@ module.exports = {
         },
         {
           name: '📸 Sistema de SS',
-          value: '• Analistas entram em serviço por tipo\n• Mediadores chamam quando necessário\n• Sistema seleciona analista disponível\n• Notificação via DM',
+          value: '• Analistas entram em serviço por tipo (Mobile/Emulador)\n• Mediadores chamam via painel ou comando\n• Sistema seleciona analista disponível\n• Notificação via DM',
           inline: false
         },
         {
-          name: '🔄 Sistema de Renovação',
-          value: '• Mediadores têm 7 dias de acesso\n• Renovação automática 24h antes\n• Canal privado criado para confirmar\n• Remoção automática se não renovar',
+          name: '👔 Sistema de Mediadores',
+          value: '• Entram/saem de serviço via painel\n• Contador mostra quantos estão ativos\n• Multa pendente bloqueia trabalho\n• Renovação automática a cada 7 dias',
+          inline: false
+        },
+        {
+          name: '🎫 Sistema de Tickets',
+          value: '• Botão "Atender Ticket" para staff\n• Apenas quem atendeu pode fechar\n• Criador também pode fechar seu ticket\n• Donos sempre podem fechar',
+          inline: false
+        },
+        {
+          name: '💸 Sistema de Multas',
+          value: '• Donos podem multar mediadores\n• Cria canal privado de pagamento\n• Multado não pode trabalhar até pagar\n• Auto-expulso da fila de trabalho',
           inline: false
         }
       );
