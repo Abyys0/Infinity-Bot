@@ -1,6 +1,7 @@
 // Handler de Menus de Seleção (StringSelectMenu)
 
 const ticketMenus = require('./selectMenus/ticketMenus');
+const queueMenus = require('./selectMenus/queueMenus');
 
 async function handleSelectMenu(interaction) {
   try {
@@ -9,6 +10,12 @@ async function handleSelectMenu(interaction) {
     // Tickets
     if (customId.startsWith('ticket_')) {
       await ticketMenus.handle(interaction);
+      return;
+    }
+
+    // Filas
+    if (customId.startsWith('fila_')) {
+      await queueMenus.handle(interaction);
       return;
     }
 

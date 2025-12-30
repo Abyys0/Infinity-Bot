@@ -208,7 +208,33 @@ module.exports = {
     const { temMultaPendente, getMultaPendente } = require('../../services/multaService');
     const permissions = require('../../config/permissions');
     
-    const filaId = interaction.customId.replace('entrar_fila_', '');
+    // Extrair filaId e opção escolhida
+    // Pode ser: entrar_fila_{filaId} OU entrar_fila_{opcao}_{filaId}
+    const customId = interaction.customId;
+    let filaId, opcao;
+    
+    // Verificar se tem opção no meio
+    if (customId.match(/^entrar_fila_[a-z0-9]+_fila_/)) {
+      // Formato: entrar_fila_{opcao}_{filaId}
+      const parts = customId.split('_');
+      // parts = ['entrar', 'fila', 'opcao', 'fila', 'timestamp', 'hash']
+      opcao = parts[2]; // geloinfinito, gelonormal, fullump, etc
+      filaId = parts.slice(3).join('_'); // fila_timestamp_hash
+    } else if (customId.match(/^entrar_fila_misto_\d+emu_fila_/)) {
+      // Formato: entrar_fila_misto_1emu_{filaId}
+      const match = customId.match(/^entrar_fila_misto_(\d+)emu_(.+)$/);
+      opcao = `misto_${match[1]}emu`;
+      filaId = match[2];
+    } else if (customId.match(/^entrar_fila_tatico_[a-z]+_fila_/)) {
+      // Formato: entrar_fila_tatico_mobile_{filaId}
+      const match = customId.match(/^entrar_fila_tatico_([a-z]+)_(.+)$/);
+      opcao = `tatico_${match[1]}`;
+      filaId = match[2];
+    } else {
+      // Formato antigo: entrar_fila_{filaId}
+      filaId = customId.replace('entrar_fila_', '');
+      opcao = null;
+    }
     
     await interaction.deferReply({ flags: 64 });
 
@@ -241,6 +267,9 @@ module.exports = {
       });
     }
 
+    // Inicializar arrays de preferências se não existirem
+    if (!fila.preferencias) fila.preferencias = {};
+
     // Verificar se já está na fila
     if (fila.jogadores.includes(interaction.user.id)) {
       return interaction.editReply({
@@ -259,23 +288,61 @@ module.exports = {
 
     // Adicionar jogador
     fila.jogadores.push(interaction.user.id);
-    await db.updateItem('filas', f => f.id === filaId, f => ({ ...f, jogadores: fila.jogadores }));
+    
+    // Salvar preferência do jogador
+    if (opcao) {
+      fila.preferencias[interaction.user.id] = opcao;
+    }
+    
+    await db.updateItem('filas', f => f.id === filaId, f => ({ 
+      ...f, 
+      jogadores: fila.jogadores,
+      preferencias: fila.preferencias
+    }));
 
     // Atualizar mensagem
     const message = await interaction.channel.messages.fetch(fila.messageId);
     const embed = message.embeds[0];
     
     const newEmbed = new EmbedBuilder(embed.data);
+    
+    // Montar lista de jogadores com suas preferências
     const jogadoresList = fila.jogadores.length > 0
-      ? fila.jogadores.map(id => `<@${id}>`).join('\n')
+      ? fila.jogadores.map(id => {
+          const pref = fila.preferencias[id];
+          let emoji = '';
+          if (pref) {
+            if (pref.includes('geloinfinito')) emoji = '🔥';
+            else if (pref.includes('gelonormal')) emoji = '❄️';
+            else if (pref.includes('fullump')) emoji = '🔫';
+            else if (pref.includes('emu')) emoji = '💻';
+            else if (pref.includes('mobile')) emoji = '📱';
+          }
+          return `${emoji} <@${id}>`;
+        }).join('\n')
       : 'Nenhum jogador na fila.';
     
     newEmbed.spliceFields(2, 1, { name: '👥 JOGADORES', value: jogadoresList, inline: false });
     
     await message.edit({ embeds: [newEmbed], components: message.components });
 
+    // Mensagem de confirmação
+    let opcaoTexto = '';
+    if (opcao) {
+      if (opcao.includes('geloinfinito')) opcaoTexto = ' (Gelo Infinito 🔥)';
+      else if (opcao.includes('gelonormal')) opcaoTexto = ' (Gelo Normal ❄️)';
+      else if (opcao.includes('fullump')) opcaoTexto = ' (Full UMP XM8 🔫)';
+      else if (opcao.match(/misto_(\d+)emu/)) {
+        const num = opcao.match(/misto_(\d+)emu/)[1];
+        opcaoTexto = ` (${num} Emulador 💻)`;
+      }
+      else if (opcao.includes('tatico_mobile')) opcaoTexto = ' (Mobile 📱)';
+      else if (opcao.includes('tatico_emulador')) opcaoTexto = ' (Emulador 💻)';
+      else if (opcao.includes('tatico_misto')) opcaoTexto = ' (Misto 🔀)';
+    }
+
     await interaction.editReply({
-      embeds: [createSuccessEmbed('Entrou na Fila', `Você entrou na fila! (${fila.jogadores.length}/${maxJogadores})`)]
+      embeds: [createSuccessEmbed('Entrou na Fila', `Você entrou na fila${opcaoTexto}! (${fila.jogadores.length}/${maxJogadores})`)]
     });
 
     // Se completou, iniciar
@@ -853,24 +920,84 @@ module.exports = {
    * Cria fila a partir do painel fixo
    */
   async criarFilaPainel(interaction) {
+    const {  StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+    
     // Extrair valor do customId (criar_fila_10 -> 10)
     const valor = parseInt(interaction.customId.replace('criar_fila_', ''));
 
-    // Importar comando de fila para reutilizar a lógica
-    const filaCommand = require('../../commands/fila');
-    
-    // Simular execução do comando /fila
-    const mockInteraction = {
-      ...interaction,
-      options: {
-        getInteger: (name) => {
-          if (name === 'valor') return valor;
-          return null;
-        },
-        getString: () => null
-      }
-    };
+    //Mostrar menu para selecionar tipo e plataforma
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`fila_select_tipo_${valor}`)
+          .setPlaceholder('Escolha o tipo de jogo')
+          .addOptions(
+            new StringSelectMenuOptionBuilder()
+              .setLabel('1v1 Mobile')
+              .setValue('1x1_mobile')
+              .setEmoji('📱'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('1v1 Emulador')
+              .setValue('1x1_emulador')
+              .setEmoji('💻'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('1v1 Tático')
+              .setValue('1x1_tatico')
+              .setEmoji('🎯'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('2v2 Mobile')
+              .setValue('2x2_mobile')
+              .setEmoji('📱'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('2v2 Emulador')
+              .setValue('2x2_emulador')
+              .setEmoji('💻'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('2v2 Misto')
+              .setValue('2x2_misto')
+              .setEmoji('🔀'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('2v2 Tático')
+              .setValue('2x2_tatico')
+              .setEmoji('🎯'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('3v3 Mobile')
+              .setValue('3x3_mobile')
+              .setEmoji('📱'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('3v3 Emulador')
+              .setValue('3x3_emulador')
+              .setEmoji('💻'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('3v3 Misto')
+              .setValue('3x3_misto')
+              .setEmoji('🔀'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('3v3 Tático')
+              .setValue('3x3_tatico')
+              .setEmoji('🎯'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('4v4 Mobile')
+              .setValue('4x4_mobile')
+              .setEmoji('📱'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('4v4 Emulador')
+              .setValue('4x4_emulador')
+              .setEmoji('💻'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('4v4 Misto')
+              .setValue('4x4_misto')
+              .setEmoji('🔀'),
+            new StringSelectMenuOptionBuilder()
+              .setLabel('4v4 Tático')
+              .setValue('4x4_tatico')
+              .setEmoji('🎯')
+          )
+      );
 
-    await filaCommand.execute(mockInteraction);
-  }
+    await interaction.reply({
+      content: `Você selecionou **R$ ${valor}**. Escolha o tipo de jogo:`,
+      components: [row],
+      flags: 64
+    });  }
 };

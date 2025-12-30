@@ -112,7 +112,6 @@ module.exports = {
           { name: '💰 VALOR', value: `R$ ${valor.toFixed(2)}`, inline: false },
           { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
         )
-        .setImage('https://cdn.discordapp.com/attachments/1450149811960545503/1452547375884275896/IMG_20251222_020338_924.jpg?ex=6954c1a9&is=69537029&hm=49883793bcfc38f471d365fefa4bb144bb4cd859a88fe9af6ebb8aedd90b64b4&')
         .setTimestamp();
 
       // Botões - Linha 1: Entrar/Sair
