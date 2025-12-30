@@ -35,8 +35,7 @@ module.exports = {
         '**Sistema de Controle de Analistas**\n\n' +
         `${EMOJIS.ONLINE} **Para Analistas:**\n` +
         '• Entre em serviço para receber chamados\n' +
-        '• Saia de serviço quando terminar\n' +
-        '• Configure seu PIX para receber pagamentos\n\n' +
+        '• Saia de serviço quando terminar\n\n' +
         `${EMOJIS.WARNING} **Para Mediadores (Chamar Analista):**\n` +
         '• Suspeita de trapaça\n' +
         '• Verificação de resultado\n' +
@@ -83,19 +82,10 @@ module.exports = {
           .setEmoji('💻')
       );
 
-    const row3 = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('analista_configurar_pix')
-          .setLabel('Configurar Meu PIX')
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji('💰')
-      );
-
     try {
       const message = await canal.send({
         embeds: [embed],
-        components: [row1, row2, row3]
+        components: [row1, row2]
       });
 
       // Salvar messageId para atualizar depois
