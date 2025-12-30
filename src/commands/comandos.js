@@ -53,7 +53,7 @@ module.exports = {
         name: `${EMOJIS.MEDIATOR} Comandos de Mediador`,
         value: 
           '**`/mediador`** - Entrar/sair de serviço\n' +
-          '**`/fila`** - Criar fila de apostado\n' +
+          '**`/fila`** - Criar fila de apostas\n' +
           '**`/finalizar`** - Finalizar fila\n' +
           '**`/pix`** - Configurar PIX pessoal\n',
         inline: false
@@ -70,13 +70,14 @@ module.exports = {
           '**`/painelmediador`** - Criar painel de mediadores\n' +
           '**`/painelticket`** - Criar painel de tickets\n' +
           '**`/painelfila`** - Criar painel de filas\n' +
+          '**`/painelranking`** - Criar painel de ranking\n' +
           '**`/blacklist`** - Gerenciar blacklist\n' +
           '**`/diagnostico`** - Ver status do sistema\n',
         inline: false
       });
     }
 
-    embed.setFooter({ text: 'INFINITY BOT • Sistema de Apostado' });
+    embed.setFooter({ text: 'INFINITY BOT • Sistema de Apostas' });
 
     await interaction.editReply({ embeds: [embed] });
   }
