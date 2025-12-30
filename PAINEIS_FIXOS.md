@@ -96,9 +96,9 @@ Resultado: Painel com 3 botões (Consultar, Adicionar, Listar)
 ```
 
 ### O que faz:
-- Permite mediadores chamarem analistas
-- Cria painel de atendimento automaticamente
-- Sistema de fila de atendimento
+- Botão "Chamar Analista Mobile" 📱
+- Botão "Chamar Analista Emulador" 💻
+- Notifica analista disponível do tipo escolhido
 
 ### Onde usar:
 - Canal privado de mediadores
@@ -109,7 +109,35 @@ Resultado: Painel com 3 botões (Consultar, Adicionar, Listar)
 ```
 📢 Canal: #staff-mediadores
 Comando: /painelanalista canal:#staff-mediadores
-Resultado: Painel com botão "Chamar Analista"
+Resultado: Painel com 2 botões (Mobile e Emulador)
+```
+
+---
+
+## 👔 Painel de Mediadores
+
+### Como criar:
+
+```
+/painelmediador canal:#nome-do-canal
+```
+
+### O que faz:
+- **Entrar em Serviço** - Mediador fica disponível para atender
+- **Sair de Serviço** - Mediador para de receber atendimentos
+- **Ver Mediadores** - Lista todos em serviço com tempo ativo
+- Atualiza automaticamente contador de mediadores ativos
+
+### Onde usar:
+- Canal de fila de mediadores
+- Canal de controle de staff
+- Canal privado da equipe
+
+### Exemplo:
+```
+📢 Canal: #fila-mediadores
+Comando: /painelmediador canal:#fila-mediadores
+Resultado: Painel com 3 botões (Entrar, Sair, Ver Lista)
 ```
 
 ---

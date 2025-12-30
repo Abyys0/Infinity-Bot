@@ -12,6 +12,7 @@ const renewalButtons = require('./buttons/renewalButtons');
 const blacklistButtons = require('./buttons/blacklistButtons');
 const multasButtons = require('./buttons/multasButtons');
 const analistaButtons = require('./buttons/analistaButtons');
+const mediadorButtons = require('./buttons/mediadorButtons');
 
 /**
  * Processa cliques em botões
@@ -77,6 +78,11 @@ async function handleButton(interaction) {
     // Botões novos de analista (Mobile/Emulador)
     if (customId.startsWith('chamar_analista_')) {
       return await analistaButtons.handle(interaction);
+    }
+
+    // Botões do painel de mediador
+    if (customId.startsWith('mediador_')) {
+      return await mediadorButtons.handle(interaction);
     }
 
     // Botão de criar ticket do painel fixo
