@@ -28,27 +28,22 @@ module.exports = {
 
     const canal = interaction.options.getChannel('canal');
 
-    // Criar embed do painel
-    const embed = new EmbedBuilder()
-      .setTitle(`${EMOJIS.ANALYST} Painel de Analistas`)
+    // PAINEL 1: Para Analistas (Entrar/Sair de Serviço)
+    const embedAnalistas = new EmbedBuilder()
+      .setTitle(`${EMOJIS.ANALYST} Painel de Controle - Analistas`)
       .setDescription(
-        '**Sistema de Controle de Analistas**\n\n' +
-        `${EMOJIS.ONLINE} **Para Analistas:**\n` +
-        '• Entre em serviço para receber chamados\n' +
-        '• Saia de serviço quando terminar\n\n' +
-        `${EMOJIS.WARNING} **Para Mediadores (Chamar Analista):**\n` +
-        '• Suspeita de trapaça\n' +
-        '• Verificação de resultado\n' +
-        '• Análise de SS (screenshot)\n' +
-        '• Disputas de partidas\n\n' +
+        `${EMOJIS.ONLINE} **Sistema de Gerenciamento de Analistas**\n\n` +
+        '**Para Analistas:**\n' +
+        '• 🟢 **Entrar em Serviço:** Fique disponível para chamados\n' +
+        '• ⚪ **Sair de Serviço:** Pare de receber chamados\n' +
+        '• 📊 **Ver Analistas:** Veja quem está em serviço\n\n' +
         `📊 **Analistas em Serviço:** 0`
       )
-      .setColor(COLORS.PRIMARY)
+      .setColor(COLORS.SUCCESS)
       .setTimestamp()
-      .setFooter({ text: 'INFINITY BOT • Sistema de Analistas' });
+      .setFooter({ text: 'INFINITY BOT • Painel de Analistas' });
 
-    // Botões para analistas (Entrar/Sair de Serviço)
-    const row1 = new ActionRowBuilder()
+    const botoesAnalistas = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
           .setCustomId('analista_entrar_servico')
@@ -67,8 +62,25 @@ module.exports = {
           .setEmoji('📊')
       );
 
-    // Botões para chamar analista (Mobile/Emulador)
-    const row2 = new ActionRowBuilder()
+    // PAINEL 2: Para Mediadores (Chamar Analista)
+    const embedChamar = new EmbedBuilder()
+      .setTitle(`${EMOJIS.WARNING} Chamar Analista - Mediadores`)
+      .setDescription(
+        '**Sistema de Chamado de Analistas**\n\n' +
+        `${EMOJIS.WARNING} **Quando Chamar:**\n` +
+        '• 🔍 Suspeita de trapaça\n' +
+        '• ✅ Verificação de resultado\n' +
+        '• 📸 Análise de SS (screenshot)\n' +
+        '• ⚔️ Disputas de partidas\n\n' +
+        '**Escolha o tipo de analista:**\n' +
+        '📱 **Mobile:** Análise em celular\n' +
+        '💻 **Emulador:** Análise em emulador'
+      )
+      .setColor(COLORS.WARNING)
+      .setTimestamp()
+      .setFooter({ text: 'INFINITY BOT • Apenas Mediadores' });
+
+    const botoesChamar = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
           .setCustomId('chamar_analista_mobile')
@@ -83,20 +95,28 @@ module.exports = {
       );
 
     try {
-      const message = await canal.send({
-        embeds: [embed],
-        components: [row1, row2]
+      // Enviar PAINEL 1 - Para Analistas
+      const messageAnalistas = await canal.send({
+        embeds: [embedAnalistas],
+        components: [botoesAnalistas]
       });
 
-      // Salvar messageId para atualizar depois
+      // Enviar PAINEL 2 - Para Mediadores
+      const messageChamar = await canal.send({
+        embeds: [embedChamar],
+        components: [botoesChamar]
+      });
+
+      // Salvar messageIds para atualizar depois
       const db = require('../database');
       const config = await db.readData('config');
-      config.painelAnalistaMessageId = message.id;
+      config.painelAnalistaMessageId = messageAnalistas.id;
       config.painelAnalistaChannelId = canal.id;
+      config.painelChamarAnalistaMessageId = messageChamar.id;
       await db.writeData('config', config);
 
       await interaction.editReply({
-        content: `✅ Painel de analista criado em ${canal}!`
+        content: `✅ Painéis de analista criados em ${canal}!\n• **Painel 1:** Controle para Analistas\n• **Painel 2:** Chamar Analista (Mediadores)`
       });
     } catch (error) {
       console.error('Erro ao criar painel de analista:', error);
