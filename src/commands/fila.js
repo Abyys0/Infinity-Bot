@@ -40,6 +40,21 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
 
+    // Verificar se há mediadores em serviço
+    const { getActiveMediadores } = require('../services/mediadorService');
+    const mediadores = await getActiveMediadores();
+    const mediadoresOnDuty = mediadores.filter(m => m.onDuty);
+
+    if (mediadoresOnDuty.length === 0) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed(
+          '⚠️ Nenhum Mediador em Serviço',
+          'Não é possível criar filas no momento pois não há mediadores em serviço.\n\n' +
+          'Aguarde até que um mediador entre em serviço!'
+        )]
+      });
+    }
+
     // Verificar se usuário tem multa pendente
     if (await temMultaPendente(interaction.user.id)) {
       const multa = await getMultaPendente(interaction.user.id);
@@ -91,18 +106,17 @@ module.exports = {
 
       // Criar embed da fila
       const queueEmbed = new EmbedBuilder()
-        .setColor(COLORS.PRIMARY)
-        .setTitle('🏆 STORM E-SPORTS')
+        .setTitle('INFINITY APOSTAS')
         .addFields(
           { name: '🎮 MODO', value: `${tipo} ${plataforma}`, inline: false },
           { name: '💰 VALOR', value: `R$ ${valor.toFixed(2)}`, inline: false },
           { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
         )
-        .setImage('https://cdn.discordapp.com/attachments/1234567890/banner.png') // Substitua pela URL real
+        .setImage('https://cdn.discordapp.com/attachments/1450149811960545503/1452547375884275896/IMG_20251222_020338_924.jpg?ex=6954c1a9&is=69537029&hm=49883793bcfc38f471d365fefa4bb144bb4cd859a88fe9af6ebb8aedd90b64b4&')
         .setTimestamp();
 
-      // Botões
-      const row = new ActionRowBuilder()
+      // Botões - Linha 1: Entrar/Sair
+      const row1 = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
             .setCustomId(`entrar_fila_${filaId}`)
@@ -116,9 +130,26 @@ module.exports = {
             .setEmoji('✖️')
         );
 
+      // Botões - Linha 2: Gelo Infinito/Gelo Normal
+      const row2 = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`gelo_infinito_${filaId}`)
+            .setLabel('Gelo Infinito')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🧊')
+            .setDisabled(true), // Habilitado quando fila iniciar
+          new ButtonBuilder()
+            .setCustomId(`gelo_normal_${filaId}`)
+            .setLabel('Gelo Normal')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('❄️')
+            .setDisabled(true) // Habilitado quando fila iniciar
+        );
+
       const message = await interaction.channel.send({
         embeds: [queueEmbed],
-        components: [row]
+        components: [row1, row2]
       });
 
       // Atualizar messageId

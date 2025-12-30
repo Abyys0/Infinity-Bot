@@ -2,7 +2,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createErrorEmbed, createSuccessEmbed } = require('../../utils/embeds');
-const { EMOJIS, COLORS } = require('../../config/constants');
+const { EMOJIS, COLORS, QUEUE_TYPES } = require('../../config/constants');
 const db = require('../../database');
 const logger = require('../../utils/logger');
 const { getActiveMediadores } = require('../../services/mediadorService');
@@ -249,7 +249,7 @@ module.exports = {
     }
 
     // Calcular quantos jogadores são necessários
-    const maxJogadores = parseInt(fila.tipo.replace('x', '')) * 2; // 1x1 = 2, 2x2 = 4, etc
+    const maxJogadores = QUEUE_TYPES[fila.tipo]?.players || 2;
     
     if (fila.jogadores.length >= maxJogadores) {
       return interaction.editReply({

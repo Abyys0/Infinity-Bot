@@ -120,6 +120,22 @@ client.on('messageCreate', async (message) => {
   }
 });
 
+// Evento: Mensagem deletada (registrar no log)
+client.on('messageDelete', async (message) => {
+  try {
+    const db = require('./database');
+    if (message.partial) await message.fetch();
+    
+    // Marcar como deletada no log
+    await db.updateItem('messageLogs',
+      m => m.id === message.id,
+      m => ({ ...m, deleted: true, deletedAt: Date.now() })
+    );
+  } catch (error) {
+    console.error('❌ Erro ao registrar mensagem deletada:', error);
+  }
+});
+
 // Evento: Erro
 client.on('error', (error) => {
   console.error('❌ Erro no cliente Discord:', error);

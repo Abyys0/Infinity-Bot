@@ -13,6 +13,7 @@ const blacklistButtons = require('./buttons/blacklistButtons');
 const multasButtons = require('./buttons/multasButtons');
 const analistaButtons = require('./buttons/analistaButtons');
 const mediadorButtons = require('./buttons/mediadorButtons');
+const rankingButtons = require('./buttons/rankingButtons');
 
 /**
  * Processa cliques em botões
@@ -24,6 +25,11 @@ async function handleButton(interaction) {
     // Botões do painel do dono
     if (customId.startsWith('owner_')) {
       return await ownerPanelButtons.handle(interaction);
+    }
+
+    // Botões de ranking
+    if (customId.startsWith('ranking_')) {
+      return await rankingButtons.handle(interaction);
     }
 
     // Botões de fila

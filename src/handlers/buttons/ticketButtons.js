@@ -133,34 +133,87 @@ async function handle(interaction) {
       });
     }
 
-    // Verificar se pode fechar
-    const isCreator = ticket.userId === interaction.user.id;
+    // Verificar se pode fechar - CRIADOR NÃO PODE FECHAR!
     const isAttendant = ticket.atendidoPor === interaction.user.id;
     const isOwner = await permissions.isOwner(interaction.user.id, interaction.member);
+    const canAttend = await permissions.canAttendTickets(interaction.member);
 
-    if (!isCreator && !isAttendant && !isOwner) {
+    if (!isAttendant && !isOwner && !canAttend) {
       return interaction.reply({
         embeds: [createErrorEmbed(
           'Sem Permissão',
-          ticket.atendidoPor
-            ? 'Apenas o criador do ticket, o atendente ou donos podem fechá-lo.'
-            : 'Apenas o criador do ticket ou donos podem fechá-lo.'
+          'Apenas o atendente do ticket, staff ou donos podem fechá-lo.'
         )],
         flags: 64
       });
     }
 
-    await interaction.deferReply();
+    // Mostrar modal para pedir motivo
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+    
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_close_ticket_${ticket.id}`)
+      .setTitle('Fechar Ticket');
 
-    const result = await closeTicket(interaction.channel, interaction.user.id);
+    const motivoInput = new TextInputBuilder()
+      .setCustomId('motivo')
+      .setLabel('Motivo do Fechamento')
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder('Descreva o motivo do fechamento...')
+      .setRequired(true)
+      .setMinLength(10)
+      .setMaxLength(500);
 
-    if (!result.success) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Erro', result.message)]
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(motivoInput)
+    );
+
+    return await interaction.showModal(modal);
+  }
+
+  // ticket_add_member
+  if (customId === 'ticket_add_member') {
+    const db = require('../../database');
+    const ticket = await db.findItem('tickets', t => t.channelId === interaction.channel.id);
+
+    if (!ticket) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Ticket Não Encontrado', 'Este canal não é um ticket válido.')],
+        flags: 64
       });
     }
 
-    // Mensagem já enviada pelo service
+    // Verificar permissão
+    const canAttend = await permissions.canAttendTickets(interaction.member);
+    const isOwner = await permissions.isOwner(interaction.user.id, interaction.member);
+    const isAttendant = ticket.atendidoPor === interaction.user.id;
+
+    if (!canAttend && !isOwner && !isAttendant) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Sem Permissão', 'Apenas atendentes podem adicionar membros.')],
+        flags: 64
+      });
+    }
+
+    // Mostrar modal
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+    
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_add_member_ticket_${ticket.id}`)
+      .setTitle('Adicionar Membro ao Ticket');
+
+    const userIdInput = new TextInputBuilder()
+      .setCustomId('user_id')
+      .setLabel('ID do Usuário')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('123456789012345678')
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(userIdInput)
+    );
+
+    return await interaction.showModal(modal);
   }
 }
 

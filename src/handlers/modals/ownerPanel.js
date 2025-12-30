@@ -86,6 +86,137 @@ async function handle(interaction) {
     }
   }
 
+  // modal_owner_add_analista
+  if (customId === 'modal_owner_add_analista') {
+    const userId = interaction.fields.getTextInputValue('user_id').trim();
+    const tipo = interaction.fields.getTextInputValue('tipo').trim().toLowerCase();
+
+    // Validar ID
+    if (!isValidDiscordId(userId)) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('ID Inválido', 'O ID do usuário é inválido.')],
+        flags: 64
+      });
+    }
+
+    // Validar tipo
+    if (tipo !== 'mobile' && tipo !== 'emulador') {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Tipo Inválido', 'O tipo deve ser "mobile" ou "emulador".')],
+        flags: 64
+      });
+    }
+
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      // Verificar se usuário existe
+      const user = await interaction.client.users.fetch(userId).catch(() => null);
+      if (!user) {
+        return interaction.editReply({
+          embeds: [createErrorEmbed('Usuário Não Encontrado', 'Não foi possível encontrar o usuário com este ID.')]
+        });
+      }
+
+      // Verificar se já existe
+      const analistas = await db.readData('analistas');
+      const existente = analistas.find(a => a.userId === userId && a.active);
+
+      if (existente) {
+        return interaction.editReply({
+          embeds: [createErrorEmbed('Já Registrado', `${user.tag} já está registrado como analista.`)]
+        });
+      }
+
+      // Adicionar analista
+      const novoAnalista = {
+        userId,
+        tipo,
+        active: true,
+        onDuty: false,
+        addedAt: Date.now(),
+        addedBy: interaction.user.id
+      };
+
+      await db.addItem('analistas', novoAnalista);
+
+      // Log
+      await logger.logAnalista(interaction.client, 'add', userId, user.tag, tipo, interaction.user.tag);
+
+      const tipoEmoji = tipo === 'mobile' ? '📱' : '💻';
+      const tipoNome = tipo === 'mobile' ? 'Mobile' : 'Emulador';
+
+      await interaction.editReply({
+        embeds: [createSuccessEmbed(
+          'Analista Adicionado',
+          `${EMOJIS.SUCCESS} **${user.tag}** foi adicionado como analista!\n\n${tipoEmoji} **Tipo:** ${tipoNome}`
+        )]
+      });
+
+    } catch (error) {
+      console.error('Erro ao adicionar analista:', error);
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao adicionar o analista.')]
+      });
+    }
+  }
+
+  // modal_owner_remove_analista
+  if (customId === 'modal_owner_remove_analista') {
+    const userId = interaction.fields.getTextInputValue('user_id').trim();
+
+    // Validar ID
+    if (!isValidDiscordId(userId)) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('ID Inválido', 'O ID do usuário é inválido.')],
+        flags: 64
+      });
+    }
+
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      // Verificar se usuário existe
+      const user = await interaction.client.users.fetch(userId).catch(() => null);
+      if (!user) {
+        return interaction.editReply({
+          embeds: [createErrorEmbed('Usuário Não Encontrado', 'Não foi possível encontrar o usuário com este ID.')]
+        });
+      }
+
+      // Remover analista
+      const analistas = await db.readData('analistas');
+      const analista = analistas.find(a => a.userId === userId && a.active);
+
+      if (!analista) {
+        return interaction.editReply({
+          embeds: [createErrorEmbed('Não Encontrado', `${user.tag} não está registrado como analista.`)]
+        });
+      }
+
+      await db.updateItem('analistas',
+        a => a.userId === userId,
+        a => ({ ...a, active: false, removedAt: Date.now(), removedBy: interaction.user.id })
+      );
+
+      // Log
+      await logger.logAnalista(interaction.client, 'remove', userId, user.tag, analista.tipo, interaction.user.tag);
+
+      await interaction.editReply({
+        embeds: [createSuccessEmbed(
+          'Analista Removido',
+          `${EMOJIS.SUCCESS} **${user.tag}** foi removido dos analistas!`
+        )]
+      });
+
+    } catch (error) {
+      console.error('Erro ao remover analista:', error);
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao remover o analista.')]
+      });
+    }
+  }
+
   // modal_owner_config_taxes
   if (customId === 'modal_owner_config_taxes') {
     const mediadorTax = interaction.fields.getTextInputValue('mediador_tax').trim();

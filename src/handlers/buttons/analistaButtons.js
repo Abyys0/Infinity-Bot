@@ -10,61 +10,23 @@ const logger = require('../../utils/logger');
 async function handle(interaction) {
   const customId = interaction.customId;
 
-  // analista_entrar_servico
-  if (customId === 'analista_entrar_servico') {
-    await interaction.deferReply({ flags: 64 });
-
-    // Verificar se está registrado como analista
-    const analistas = await db.readData('analistas');
-    const analista = analistas.find(a => a.userId === interaction.user.id && a.active);
-
-    if (!analista) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Não Registrado', 'Você não está registrado como analista no sistema.\n\nPeça para um dono te adicionar com `/painel`.')]
-      });
-    }
-
-    // Verificar multa
-    const { temMultaPendente, getMultaPendente } = require('../../services/multaService');
-    const temMulta = await temMultaPendente(interaction.user.id);
-    
-    if (temMulta) {
-      const multa = await getMultaPendente(interaction.user.id);
-      return interaction.editReply({
-        embeds: [createErrorEmbed(
-          '🚫 Multa Pendente',
-          `Você não pode entrar em serviço pois tem uma multa pendente!\n\n` +
-          `**💰 Valor:** R$ ${multa.valor}\n` +
-          `**📝 Motivo:** ${multa.motivo}\n` +
-          `**📍 Canal:** <#${multa.canalId}>\n\n` +
-          `Pague a multa para voltar a trabalhar.`
-        )]
-      });
-    }
-
-    if (analista.onDuty) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Já em Serviço', 'Você já está em serviço!')]
-      });
-    }
-
-    // Entrar em serviço
-    await db.updateItem('analistas',
-      a => a.userId === interaction.user.id,
-      a => ({ ...a, onDuty: true, onDutySince: Date.now() })
-    );
-
-    // Atualizar painel
-    await atualizarPainel(interaction.client);
-
-    return interaction.editReply({
-      embeds: [createSuccessEmbed(
-        'Em Serviço',
-        `${EMOJIS.ONLINE} **Você entrou em serviço como analista!**\n\nAguarde chamados de mediadores.`
-      )]
-    });
+  // analista_entrar_servico_mobile
+  if (customId === 'analista_entrar_servico_mobile') {
+    await handleEntrarServico(interaction, ANALYST_TYPES.MOBILE);
+    return;
   }
 
+  // analista_entrar_servico_emulador
+  if (customId === 'analista_entrar_servico_emulador') {
+    await handleEntrarServico(interaction, ANALYST_TYPES.EMULATOR);
+    return;
+  }
+
+  // analista_entrar_servico (legado - perguntar qual tipo)
+  if (customId === 'analista_entrar_servico') {
+    await handleEntrarServico(interaction, null);
+    return;
+  }
   // analista_sair_servico
   if (customId === 'analista_sair_servico') {
     await interaction.deferReply({ flags: 64 });
@@ -298,6 +260,80 @@ async function atualizarPainel(client) {
   } catch (error) {
     logger.error('Erro ao atualizar painel de analistas:', error);
   }
+}
+
+// Função auxiliar para entrar em serviço
+async function handleEntrarServico(interaction, tipo) {
+  await interaction.deferReply({ flags: 64 });
+
+  // Verificar se está registrado como analista
+  const analistas = await db.readData('analistas');
+  const analista = analistas.find(a => a.userId === interaction.user.id && a.active);
+
+  if (!analista) {
+    return interaction.editReply({
+      embeds: [createErrorEmbed('Não Registrado', 'Você não está registrado como analista no sistema.\n\nPeça para um dono te adicionar com `/painel`.')]
+    });
+  }
+
+  // Se não especificou tipo, verificar se analista tem tipo definido
+  if (!tipo) {
+    if (analista.tipo) {
+      tipo = analista.tipo;
+    } else {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Tipo não definido', 'Você precisa escolher o tipo: Mobile ou Emulador')]
+      });
+    }
+  }
+
+  // Verificar multa
+  const { temMultaPendente, getMultaPendente } = require('../../services/multaService');
+  const temMulta = await temMultaPendente(interaction.user.id);
+  
+  if (temMulta) {
+    const multa = await getMultaPendente(interaction.user.id);
+    return interaction.editReply({
+      embeds: [createErrorEmbed(
+        '🚫 Multa Pendente',
+        `Você não pode entrar em serviço pois tem uma multa pendente!\n\n` +
+        `**💰 Valor:** R$ ${multa.valor}\n` +
+        `**📝 Motivo:** ${multa.motivo}\n` +
+        `**📍 Canal:** <#${multa.canalId}>\n\n` +
+        `Pague a multa para voltar a trabalhar.`
+      )]
+    });
+  }
+
+  if (analista.onDuty) {
+    const tipoAtualEmoji = analista.tipo === ANALYST_TYPES.MOBILE ? '📱' : '💻';
+    const tipoAtualNome = analista.tipo === ANALYST_TYPES.MOBILE ? 'Mobile' : 'Emulador';
+    return interaction.editReply({
+      embeds: [createErrorEmbed(
+        'Já em Serviço', 
+        `Você já está em serviço como ${tipoAtualEmoji} **${tipoAtualNome}**!\n\nSaia de serviço antes de trocar de tipo.`
+      )]
+    });
+  }
+
+  // Entrar em serviço
+  await db.updateItem('analistas',
+    a => a.userId === interaction.user.id,
+    a => ({ ...a, onDuty: true, tipo, onDutySince: Date.now() })
+  );
+
+  // Atualizar painel
+  await atualizarPainel(interaction.client);
+
+  const tipoEmoji = tipo === ANALYST_TYPES.MOBILE ? '📱' : '💻';
+  const tipoNome = tipo === ANALYST_TYPES.MOBILE ? 'Mobile' : 'Emulador';
+
+  return interaction.editReply({
+    embeds: [createSuccessEmbed(
+      'Em Serviço',
+      `${EMOJIS.ONLINE} **Você entrou em serviço!**\n\n${tipoEmoji} **Tipo:** Analista ${tipoNome}\n\nAguarde chamados de mediadores.`
+    )]
+  });
 }
 
 module.exports = { handle };

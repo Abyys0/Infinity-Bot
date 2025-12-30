@@ -46,15 +46,24 @@ module.exports = {
     const botoesAnalistas = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
-          .setCustomId('analista_entrar_servico')
-          .setLabel('Entrar em Serviço')
+          .setCustomId('analista_entrar_servico_mobile')
+          .setLabel('Entrar - Mobile')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('🟢'),
+          .setEmoji('📱'),
+        new ButtonBuilder()
+          .setCustomId('analista_entrar_servico_emulador')
+          .setLabel('Entrar - Emulador')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('💻'),
         new ButtonBuilder()
           .setCustomId('analista_sair_servico')
           .setLabel('Sair de Serviço')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('⚪'),
+          .setEmoji('⚪')
+      );
+
+    const botoesAnalistas2 = new ActionRowBuilder()
+      .addComponents(
         new ButtonBuilder()
           .setCustomId('analista_ver_lista')
           .setLabel('Ver Analistas')
@@ -98,7 +107,7 @@ module.exports = {
       // Enviar PAINEL 1 - Para Analistas
       const messageAnalistas = await canal.send({
         embeds: [embedAnalistas],
-        components: [botoesAnalistas]
+        components: [botoesAnalistas, botoesAnalistas2]
       });
 
       // Enviar PAINEL 2 - Para Mediadores

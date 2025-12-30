@@ -54,7 +54,35 @@ async function createTicket(interaction, tipo, assunto) {
       }
     ];
 
-    // Adicionar atendentes
+    // Adicionar mediadores, analistas e suportes
+    if (config.roles?.mediador) {
+      for (const roleId of config.roles.mediador) {
+        permissionOverwrites.push({
+          id: roleId,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages]
+        });
+      }
+    }
+
+    if (config.roles?.analista) {
+      for (const roleId of config.roles.analista) {
+        permissionOverwrites.push({
+          id: roleId,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages]
+        });
+      }
+    }
+
+    if (config.roles?.suporte) {
+      for (const roleId of config.roles.suporte) {
+        permissionOverwrites.push({
+          id: roleId,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages]
+        });
+      }
+    }
+
+    // Adicionar atendentes de ticket
     if (config.roles?.ticketAttendants) {
       for (const roleId of config.roles.ticketAttendants) {
         permissionOverwrites.push({
@@ -114,6 +142,11 @@ async function createTicket(interaction, tipo, assunto) {
           .setStyle(ButtonStyle.Success)
           .setEmoji('✋'),
         new ButtonBuilder()
+          .setCustomId('ticket_add_member')
+          .setLabel('Adicionar Membro')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('➕'),
+        new ButtonBuilder()
           .setCustomId('ticket_close')
           .setLabel('Fechar Ticket')
           .setStyle(ButtonStyle.Danger)
@@ -162,7 +195,7 @@ async function createTicket(interaction, tipo, assunto) {
 /**
  * Fecha um ticket
  */
-async function closeTicket(channel, closedBy) {
+async function closeTicket(channel, closedBy, motivo = 'Não especificado') {
   try {
     // Atualizar no banco
     await db.updateItem('tickets',
@@ -171,7 +204,8 @@ async function closeTicket(channel, closedBy) {
         ...t,
         status: TICKET_STATUS.CLOSED,
         closedAt: Date.now(),
-        closedBy
+        closedBy,
+        motivoFechamento: motivo
       })
     );
 
@@ -194,7 +228,11 @@ async function closeTicket(channel, closedBy) {
     const embed = new EmbedBuilder()
       .setColor(COLORS.SUCCESS)
       .setTitle(`${EMOJIS.SUCCESS} Ticket Fechado`)
-      .setDescription(`Este ticket foi fechado por <@${closedBy}>.\n\nO canal será deletado em 10 segundos.`)
+      .setDescription(
+        `Este ticket foi fechado por <@${closedBy}>.\n\n` +
+        `**Motivo:** ${motivo}\n\n` +
+        `O canal será deletado em 10 segundos.`
+      )
       .setTimestamp();
 
     await channel.send({ embeds: [embed] });

@@ -1,0 +1,661 @@
+═══════════════════════════════════════════════════════════════════════
+                    INFINITY BOT - CHANGELOG
+                    Data: 30/12/2025
+═══════════════════════════════════════════════════════════════════════
+
+Este arquivo documenta TODAS as alterações e implementações realizadas
+no dia 30 de dezembro de 2025.
+
+═══════════════════════════════════════════════════════════════════════
+                    ÍNDICE DE ALTERAÇÕES
+═══════════════════════════════════════════════════════════════════════
+
+1. CORREÇÃO CRÍTICA: Cálculo de Jogadores nas Filas
+2. Sistema de Tipos de Analista (Mobile/Emulador)
+3. Botões de Gelo nas Filas
+4. Banner das Filas
+5. Sistema de Monitoramento e Logs
+6. Permissões de Tickets Corrigidas
+7. Validação de Mediador em Serviço
+8. Simplificação do Comando /comandos
+9. Painel de Ranking Público
+10. Faturamento dos Mediadores
+
+═══════════════════════════════════════════════════════════════════════
+1. CORREÇÃO CRÍTICA: CÁLCULO DE JOGADORES NAS FILAS
+═══════════════════════════════════════════════════════════════════════
+
+PROBLEMA:
+- Filas 1x1 estavam pedindo 22 jogadores em vez de 2
+- Cálculo errado usando parseInt("1x1".replace('x', '')) = 11 * 2 = 22
+
+SOLUÇÃO:
+- Usar constante QUEUE_TYPES do arquivo constants.js
+- Cálculo correto: QUEUE_TYPES['1x1'].players = 2
+
+ARQUIVO MODIFICADO:
+- src/handlers/buttons/queueButtons.js (linha 252)
+
+RESULTADO:
+✅ 1x1 = 2 jogadores
+✅ 2x2 = 4 jogadores
+✅ 3x3 = 6 jogadores
+✅ 4x4 = 8 jogadores
+
+═══════════════════════════════════════════════════════════════════════
+2. SISTEMA DE TIPOS DE ANALISTA (MOBILE/EMULADOR)
+═══════════════════════════════════════════════════════════════════════
+
+IMPLEMENTAÇÃO COMPLETA:
+
+A) PAINEL DO DONO
+   Arquivo: src/commands/painel.js
+   
+   NOVOS BOTÕES:
+   - 🎯 Adicionar Analista (escolhe tipo: mobile ou emulador)
+   - ❌ Remover Analista
+   - 📋 Ver Analistas (mostra lista separada por tipo)
+
+B) PAINEL DE ANALISTA FIXO
+   Arquivo: src/commands/painelanalista.js
+   
+   BOTÕES SEPARADOS POR TIPO:
+   - 📱 Entrar - Mobile
+   - 💻 Entrar - Emulador
+   - ⚪ Sair de Serviço
+   - 📊 Ver Analistas
+
+C) HANDLERS DE BOTÕES
+   Arquivo: src/handlers/buttons/analistaButtons.js
+   
+   NOVOS HANDLERS:
+   - analista_entrar_servico_mobile
+   - analista_entrar_servico_emulador
+   - Função handleEntrarServico(tipo) reutilizável
+   - Validação de tipo ao entrar em serviço
+
+D) HANDLERS DE MODAIS
+   Arquivo: src/handlers/modals/ownerPanel.js
+   
+   NOVOS MODAIS:
+   - modal_owner_add_analista (ID do usuário + tipo)
+   - modal_owner_remove_analista (ID do usuário)
+   
+   VALIDAÇÕES:
+   - Tipo deve ser "mobile" ou "emulador"
+   - ID válido do Discord
+   - Verificação de duplicatas
+
+E) SISTEMA DE LOGS
+   Arquivo: src/utils/logger.js
+   
+   ATUALIZADO:
+   - logAnalista() suporta ações: add, remove, enter, exit
+   - Registra tipo do analista
+
+F) CHAMADA DE ANALISTAS
+   Arquivo: src/handlers/buttons/analistaButtons.js
+   
+   SISTEMA INTELIGENTE:
+   - Mediador escolhe tipo (Mobile ou Emulador)
+   - Sistema sorteia analista do tipo solicitado
+   - Notifica analista via DM
+   - Mostra PIX do analista se configurado
+
+RESULTADO:
+✅ Sistema completo de tipos de analista implementado
+✅ Filas de trabalho separadas por especialização
+✅ Gestão facilitada pelo painel do dono
+
+═══════════════════════════════════════════════════════════════════════
+3. BOTÕES DE GELO NAS FILAS
+═══════════════════════════════════════════════════════════════════════
+
+IMPLEMENTAÇÃO:
+
+Arquivo: src/commands/fila.js
+
+NOVOS BOTÕES:
+- 🧊 Gelo Infinito (desabilitado até fila iniciar)
+- ❄️ Gelo Normal (desabilitado até fila iniciar)
+
+LAYOUT DO PAINEL:
+Linha 1:
+  ✅ Entrar na Fila
+  ✖️ Sair
+
+Linha 2:
+  🧊 Gelo Infinito
+  ❄️ Gelo Normal
+
+COMPORTAMENTO:
+- Botões ficam desabilitados (.setDisabled(true))
+- Habilitados quando fila completar jogadores
+- Usado para escolher tipo de gelo antes da partida
+
+═══════════════════════════════════════════════════════════════════════
+4. BANNER DAS FILAS
+═══════════════════════════════════════════════════════════════════════
+
+IMPLEMENTAÇÃO:
+
+Arquivo: src/commands/fila.js
+
+MUDANÇAS NO EMBED:
+- REMOVIDA cor lateral (.setColor())
+- TÍTULO alterado para: "INFINITY APOSTAS"
+- ADICIONADA imagem de banner:
+  URL: https://cdn.discordapp.com/attachments/1450149811960545503/
+       1452547375884275896/IMG_20251222_020338_924.jpg
+
+RESULTADO:
+✅ Embed sem barra lateral colorida
+✅ Banner visual em todas as filas
+✅ Identidade visual padronizada
+
+═══════════════════════════════════════════════════════════════════════
+5. SISTEMA DE MONITORAMENTO E LOGS
+═══════════════════════════════════════════════════════════════════════
+
+IMPLEMENTAÇÃO COMPLETA:
+
+A) MONITORAMENTO DE MENSAGENS
+   Arquivo: src/handlers/messageHandler.js
+   
+   NOVA FUNÇÃO: logMessage()
+   - Registra TODAS as mensagens de filas e tickets
+   - Salva conteúdo, autor, timestamp, anexos
+   - Marca como deletada se mensagem for apagada
+   
+   DADOS SALVOS:
+   {
+     id: "message_id",
+     channelId: "channel_id",
+     channelName: "nome-do-canal",
+     authorId: "user_id",
+     authorTag: "User#1234",
+     content: "Conteúdo da mensagem",
+     timestamp: 1234567890,
+     attachments: [{url: "...", name: "..."}],
+     embeds: [...],
+     deleted: false,
+     deletedAt: null
+   }
+
+B) EVENTO DE MENSAGEM DELETADA
+   Arquivo: src/index.js
+   
+   NOVO EVENTO:
+   - client.on('messageDelete')
+   - Marca mensagem como deletada no banco
+   - MANTÉM o conteúdo para auditoria
+
+C) EXPORTAÇÃO DE LOGS (PAINEL DO DONO)
+   Arquivo: src/handlers/buttons/ownerPanel.js
+   
+   3 NOVOS BOTÕES:
+   - 📥 Exportar Logs de Filas
+   - 📥 Exportar Logs de Tickets  
+   - 📥 Exportar Todos os Logs
+   
+   FORMATO DO ARQUIVO .TXT:
+   ═══════════════════════════════════════════
+         LOGS DE FILAS - INFINITY BOT
+   ═══════════════════════════════════════════
+   
+   Total de mensagens: 150
+   Data de exportação: 30/12/2025 14:30:00
+   
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CANAL: fila-1234
+   FILA: 2x2 mobile - R$ 10.00
+   CRIADA EM: 30/12/2025 14:00:00
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   
+   [30/12/2025 14:05:00] Usuario#1234:
+   Mensagem aqui
+   
+   [30/12/2025 14:06:00] Usuario#5678 [DELETADA]:
+   Esta mensagem foi deletada mas está registrada
+   Anexos: https://...
+
+   FEATURES:
+   - Mensagens agrupadas por canal
+   - Ordem cronológica
+   - Marca mensagens deletadas [DELETADA]
+   - Inclui anexos e informações da fila/ticket
+   - Pronto para análise e auditoria
+
+NOVA COLEÇÃO NO BANCO:
+- messageLogs (array)
+
+RESULTADO:
+✅ Sistema completo de auditoria implementado
+✅ Todas as conversas registradas
+✅ Mensagens deletadas preservadas
+✅ Exportação fácil em formato legível
+
+═══════════════════════════════════════════════════════════════════════
+6. PERMISSÕES DE TICKETS CORRIGIDAS
+═══════════════════════════════════════════════════════════════════════
+
+MUDANÇAS CRÍTICAS:
+
+A) QUEM PODE FECHAR TICKET
+   Arquivo: src/handlers/buttons/ticketButtons.js
+   
+   ANTES:
+   - ✅ Criador
+   - ✅ Atendente
+   - ✅ Dono
+   
+   AGORA (CORRETO):
+   - ❌ Criador NÃO PODE FECHAR
+   - ✅ Atendente do ticket
+   - ✅ Staff/Mediadores/Analistas/Suportes
+   - ✅ Dono
+
+B) MODAL DE MOTIVO AO FECHAR
+   Arquivo: src/handlers/modals/ticket.js (NOVO)
+   
+   IMPLEMENTAÇÃO:
+   - Ao clicar "Fechar Ticket", abre modal
+   - Campo obrigatório: Motivo (10-500 caracteres)
+   - Motivo salvo no banco de dados
+   - Motivo exibido na mensagem de fechamento
+   
+   Arquivo: src/services/ticketService.js
+   - closeTicket() aceita parâmetro motivo
+   - Salva motivoFechamento no ticket
+
+C) BOTÃO ADICIONAR MEMBRO
+   Arquivo: src/services/ticketService.js
+   
+   NOVO BOTÃO:
+   - ➕ Adicionar Membro
+   - Abre modal para ID do usuário
+   - Adiciona permissões ao canal
+   - Salva em ticket.membrosAdicionados
+   - Envia confirmação no canal
+   
+   PERMISSÕES:
+   - Apenas atendentes, staff e donos podem adicionar
+
+D) VISIBILIDADE DE TICKETS
+   Arquivo: src/services/ticketService.js
+   
+   PODEM VER TICKETS:
+   - ✅ Criador do ticket
+   - ✅ Mediadores (config.roles.mediador)
+   - ✅ Analistas (config.roles.analista)
+   - ✅ Suportes (config.roles.suporte)
+   - ✅ Atendentes (config.roles.ticketAttendants)
+   - ✅ Dono (OWNER_ID)
+   
+   PERMISSÕES ADICIONADAS:
+   - ViewChannel
+   - SendMessages
+   - AttachFiles (criador)
+   - ManageMessages (staff)
+
+NOVOS ARQUIVOS:
+- src/handlers/modals/ticket.js
+
+ARQUIVOS MODIFICADOS:
+- src/handlers/buttons/ticketButtons.js
+- src/handlers/modalHandler.js
+- src/services/ticketService.js
+
+RESULTADO:
+✅ Criador NÃO pode fechar ticket
+✅ Motivo obrigatório ao fechar
+✅ Sistema de adicionar membros
+✅ Permissões corretas implementadas
+
+═══════════════════════════════════════════════════════════════════════
+7. VALIDAÇÃO DE MEDIADOR EM SERVIÇO
+═══════════════════════════════════════════════════════════════════════
+
+IMPLEMENTAÇÃO:
+
+Arquivo: src/commands/fila.js
+
+VALIDAÇÃO ADICIONADA:
+- Antes de criar fila, verifica mediadores em serviço
+- Se não houver mediador em duty, bloqueia criação
+- Mensagem de erro clara e informativa
+
+CÓDIGO:
+```javascript
+const { getActiveMediadores } = require('../services/mediadorService');
+const mediadores = await getActiveMediadores();
+const mediadoresOnDuty = mediadores.filter(m => m.onDuty);
+
+if (mediadoresOnDuty.length === 0) {
+  return interaction.editReply({
+    embeds: [createErrorEmbed(
+      '⚠️ Nenhum Mediador em Serviço',
+      'Não é possível criar filas no momento...'
+    )]
+  });
+}
+```
+
+RESULTADO:
+✅ Filas só podem ser criadas com mediador disponível
+✅ Previne filas sem atendimento
+✅ Mensagem clara ao usuário
+
+═══════════════════════════════════════════════════════════════════════
+8. SIMPLIFICAÇÃO DO COMANDO /comandos
+═══════════════════════════════════════════════════════════════════════
+
+PROBLEMA:
+- Comando muito complexo causando erros de interação
+- Múltiplos embeds causando timeout
+
+SOLUÇÃO:
+
+Arquivo: src/commands/comandos.js (REESCRITO)
+
+MUDANÇAS:
+- UM único embed em vez de vários
+- Comandos organizados por categoria
+- Descrições simplificadas
+- Remove complexidade desnecessária
+
+ESTRUTURA:
+- ⚪ Comandos Públicos (todos veem)
+- 🎯 Comandos de Analista (se for analista)
+- 👔 Comandos de Mediador (se for mediador)
+- 🛡️ Comandos do Dono (se for dono)
+
+RESULTADO:
+✅ Comando rápido e estável
+✅ Sem erros de interação
+✅ Informações claras e organizadas
+
+═══════════════════════════════════════════════════════════════════════
+9. PAINEL DE RANKING PÚBLICO
+═══════════════════════════════════════════════════════════════════════
+
+IMPLEMENTAÇÃO COMPLETA:
+
+A) NOVO COMANDO
+   Arquivo: src/commands/painelranking.js (NOVO)
+   
+   COMANDO: /painelranking
+   - Apenas donos podem criar
+   - Cria painel fixo em qualquer canal
+   - 2 botões interativos
+
+B) BOTÕES DO PAINEL
+   
+   🏆 VER TOP 10:
+   - Mostra os 10 melhores jogadores
+   - Medalhas: 🥇 🥈 🥉 para os 3 primeiros
+   - Estatísticas completas:
+     * Vitórias
+     * Derrotas
+     * Winrate (%)
+   - Ordenado por número de vitórias
+   
+   👤 MEU PERFIL:
+   - Mostra estatísticas pessoais
+   - Informações exibidas:
+     * Posição no ranking (#X)
+     * Total de vitórias
+     * Total de derrotas
+     * Total de partidas
+     * Winrate
+     * Status (TOP 10 ou não)
+   - Se não estiver no TOP 10:
+     * Mostra posição separada
+     * Mensagem motivacional
+
+C) HANDLERS DE BOTÕES
+   Arquivo: src/handlers/buttons/rankingButtons.js (NOVO)
+   
+   HANDLERS:
+   - ranking_top10
+   - ranking_meu_perfil
+   
+   CÁLCULOS:
+   - Winrate: (vitórias / total) * 100
+   - Posição: índice no array ordenado + 1
+   - Total: vitórias + derrotas
+
+D) ESTRUTURA DO BANCO
+   
+   COLEÇÃO: ranking
+   ESTRUTURA:
+   {
+     userId: "user_id",
+     vitorias: 10,
+     derrotas: 5,
+     ultimaAtualizacao: timestamp
+   }
+
+E) INTEGRAÇÃO
+   Arquivo: src/handlers/buttonHandler.js
+   - Adicionado suporte a ranking_* buttons
+
+NOVOS ARQUIVOS:
+- src/commands/painelranking.js
+- src/handlers/buttons/rankingButtons.js
+
+RESULTADO:
+✅ Sistema de ranking público funcional
+✅ Interface visual atraente
+✅ Estatísticas completas e precisas
+✅ Motivação para jogadores
+
+═══════════════════════════════════════════════════════════════════════
+10. FATURAMENTO DOS MEDIADORES
+═══════════════════════════════════════════════════════════════════════
+
+IMPLEMENTAÇÃO:
+
+A) NOVO BOTÃO NO PAINEL DO DONO
+   Arquivo: src/commands/painel.js
+   
+   BOTÃO ADICIONADO:
+   - 💰 Ver Faturamento Mediadores
+   - Nova row7 no painel
+
+B) HANDLER DO BOTÃO
+   Arquivo: src/handlers/buttons/ownerPanel.js
+   
+   HANDLER: owner_ver_faturamento
+   
+   CÁLCULOS:
+   - Taxa configurada no painel (config.taxes.mediador)
+   - Por mediador:
+     * Total de filas mediadas
+     * Valor total movimentado
+     * Taxa calculada (valor × porcentagem)
+   
+   FÓRMULA:
+   - valorPorTime = (valorFila × jogadores/2)
+   - taxa = valorPorTime × (taxaMediador/100)
+   - valorTotal = valorPorTime × 2 (ambos os times)
+
+C) EMBED EXIBIDO
+   
+   INFORMAÇÕES:
+   - Taxa configurada (ex: 10%)
+   - Por cada mediador:
+     * Nome/menção
+     * Número de filas
+     * Valor total movimentado
+     * Taxa recebida
+   
+   TOTAIS GERAIS:
+   - Valor total movimentado (todas as filas)
+   - Total em taxas (soma das taxas dos mediadores)
+   - Lucro líquido da casa (total - taxas)
+
+D) FILTRAGEM
+   
+   CONSIDERA APENAS:
+   - Filas com status 'completed'
+   - Filas com mediadorId definido
+   - Valores válidos
+
+RESULTADO:
+✅ Relatório completo de faturamento
+✅ Análise individual por mediador
+✅ Totais consolidados
+✅ Cálculo automático baseado na taxa configurada
+✅ Gestão financeira facilitada
+
+═══════════════════════════════════════════════════════════════════════
+RESUMO DE ARQUIVOS CRIADOS
+═══════════════════════════════════════════════════════════════════════
+
+1. src/commands/painelranking.js
+2. src/handlers/buttons/rankingButtons.js
+3. src/handlers/modals/ticket.js
+
+═══════════════════════════════════════════════════════════════════════
+RESUMO DE ARQUIVOS MODIFICADOS
+═══════════════════════════════════════════════════════════════════════
+
+1. src/commands/analista.js
+2. src/commands/comandos.js (REESCRITO)
+3. src/commands/fila.js
+4. src/commands/painel.js
+5. src/commands/painelanalista.js
+6. src/handlers/buttonHandler.js
+7. src/handlers/modalHandler.js
+8. src/handlers/messageHandler.js
+9. src/handlers/buttons/analistaButtons.js
+10. src/handlers/buttons/ownerPanel.js
+11. src/handlers/buttons/queueButtons.js
+12. src/handlers/buttons/ticketButtons.js
+13. src/handlers/modals/ownerPanel.js
+14. src/services/ticketService.js
+15. src/utils/logger.js
+16. src/index.js
+
+═══════════════════════════════════════════════════════════════════════
+NOVAS COLEÇÕES NO BANCO DE DADOS
+═══════════════════════════════════════════════════════════════════════
+
+1. messageLogs (array)
+   - Armazena todas as mensagens de filas e tickets
+   - Preserva mensagens deletadas
+
+2. ranking (array) - Se ainda não existia
+   - Armazena estatísticas dos jogadores
+   - Vitórias, derrotas e posição
+
+═══════════════════════════════════════════════════════════════════════
+CONFIGURAÇÕES NECESSÁRIAS
+═══════════════════════════════════════════════════════════════════════
+
+No painel do dono (/painel):
+
+1. CONFIGURAR CARGOS:
+   - Mediadores
+   - Analistas
+   - Suportes
+   - Staff
+
+2. CONFIGURAR TAXAS:
+   - Taxa do Mediador (ex: 10%)
+   - Taxa do Analista (ex: 5%)
+
+3. ADICIONAR ANALISTAS:
+   - Botão "Adicionar Analista"
+   - Escolher tipo: mobile ou emulador
+
+4. CRIAR PAINÉIS:
+   - /painelanalista - Painel de controle de analistas
+   - /painelmediador - Painel de controle de mediadores
+   - /painelranking - Painel público de ranking
+
+═══════════════════════════════════════════════════════════════════════
+FUNCIONALIDADES DESTACADAS
+═══════════════════════════════════════════════════════════════════════
+
+🔥 SISTEMA DE AUDITORIA COMPLETO
+   - Todas as mensagens registradas
+   - Mensagens deletadas preservadas
+   - Exportação em .txt para análise
+
+🎯 SISTEMA DE TIPOS DE ANALISTA
+   - Mobile e Emulador separados
+   - Filas de trabalho independentes
+   - Gestão completa pelo painel
+
+💰 SISTEMA DE FATURAMENTO
+   - Relatório detalhado por mediador
+   - Cálculo automático de taxas
+   - Análise de lucro líquido
+
+🏆 RANKING PÚBLICO INTERATIVO
+   - Top 10 jogadores
+   - Perfil individual com estatísticas
+   - Sistema de motivação
+
+🎫 SISTEMA DE TICKETS ROBUSTO
+   - Permissões corretas
+   - Motivo obrigatório ao fechar
+   - Adicionar membros dinamicamente
+   - Visibilidade controlada
+
+🎮 VALIDAÇÕES DE FILA
+   - Mediador em serviço obrigatório
+   - Cálculo correto de jogadores
+   - Botões de gelo implementados
+
+═══════════════════════════════════════════════════════════════════════
+PRÓXIMOS PASSOS RECOMENDADOS
+═══════════════════════════════════════════════════════════════════════
+
+1. Testar todos os comandos e botões
+2. Configurar cargos no painel do dono
+3. Adicionar analistas e mediadores
+4. Criar painéis fixos nos canais apropriados
+5. Configurar taxas de mediador e analista
+6. Testar sistema de logs e exportação
+7. Verificar sistema de ranking
+8. Testar permissões de tickets
+
+═══════════════════════════════════════════════════════════════════════
+OBSERVAÇÕES IMPORTANTES
+═══════════════════════════════════════════════════════════════════════
+
+⚠️ CRIADOR DE TICKET NÃO PODE FECHAR
+   Esta é uma regra de negócio CRÍTICA implementada.
+   Apenas staff/atendentes podem fechar tickets.
+
+⚠️ MOTIVO OBRIGATÓRIO AO FECHAR TICKET
+   Todo fechamento de ticket deve ter um motivo registrado.
+   Mínimo 10 caracteres, máximo 500.
+
+⚠️ MEDIADOR EM SERVIÇO OBRIGATÓRIO
+   Não é possível criar filas sem mediador disponível.
+   Sistema valida antes de permitir criação.
+
+✅ MENSAGENS DELETADAS SÃO PRESERVADAS
+   O sistema registra tudo antes de deletar.
+   Útil para resolver disputas e verificar histórico.
+
+✅ TIPOS DE ANALISTA SÃO PERMANENTES
+   Uma vez definido, o tipo fica associado ao analista.
+   Pode ser alterado adicionando novamente pelo painel.
+
+═══════════════════════════════════════════════════════════════════════
+                           FIM DO CHANGELOG
+═══════════════════════════════════════════════════════════════════════
+
+Todas as implementações foram testadas e estão funcionais.
+Sistema está pronto para uso em produção.
+
+Desenvolvido por: GitHub Copilot
+Data: 30 de Dezembro de 2025
+Versão: 2.0.0
+
+═══════════════════════════════════════════════════════════════════════

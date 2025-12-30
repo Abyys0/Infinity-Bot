@@ -15,89 +15,72 @@ module.exports = {
     const member = interaction.member;
     
     // Verificar permissões do usuário
-    const isDono = await permissions.isOwner(member.user.id);
-    const isStaff = await permissions.isStaff(member);
+    const isDono = await permissions.isOwner(interaction.user.id, member);
     const isMediador = await permissions.isMediadorOrAbove(member);
     const isAnalista = await permissions.isAnalista(member);
 
-    // Embed principal
-    const embedPrincipal = new EmbedBuilder()
+    // Embed principal - SIMPLIFICADO
+    const embed = new EmbedBuilder()
       .setColor(COLORS.PRIMARY)
-      .setTitle(`${EMOJIS.GAME} INFINITY BOT - Guia de Comandos`)
-      .setDescription('**Lista completa de comandos disponíveis**\n\nClique nos títulos abaixo para ver comandos detalhados por categoria.')
-      .setTimestamp()
-      .setFooter({ text: 'INFINITY BOT • Sistema de Apostado Free Fire' });
+      .setTitle(`${EMOJIS.GAME} INFINITY BOT - Comandos`)
+      .setDescription('**Lista de comandos disponíveis**\n')
+      .setTimestamp();
 
-    // Adicionar campos baseados nas permissões
-    if (isDono) {
-      embedPrincipal.addFields({
-        name: `🔴 ${EMOJIS.SHIELD} Comandos do Dono (Você tem acesso)`,
-        value: '`/painel` • `/mediador` • `/blacklist` • E todos os comandos abaixo',
-        inline: false
-      });
-    }
-
-    if (isStaff) {
-      embedPrincipal.addFields({
-        name: `🟠 ${EMOJIS.SHIELD} Comandos de Staff (Você tem acesso)`,
-        value: '`/blacklist` • `/ticket` (fechar) • E comandos de mediador',
-        inline: false
-      });
-    }
-
-    if (isMediador) {
-      embedPrincipal.addFields({
-        name: `🟡 ${EMOJIS.MEDIATOR} Comandos de Mediador (Você tem acesso)`,
-        value: '`/fila` • `/finalizar` • `/ss` • `/pix`',
-        inline: false
-      });
-    }
-
-    if (isAnalista) {
-      embedPrincipal.addFields({
-        name: `🟢 ${EMOJIS.ANALYST} Comandos de Analista (Você tem acesso)`,
-        value: '`/analista`',
-        inline: false
-      });
-    }
-
-    embedPrincipal.addFields({
-      name: `⚪ ${EMOJIS.USER} Comandos Públicos (Todos têm acesso)`,
-      value: '`/ticket` • `/ranking` • `/comandos`',
+    // Comandos Públicos
+    embed.addFields({
+      name: '⚪ Comandos Públicos',
+      value: 
+        '**`/ticket`** - Abrir ticket de suporte ou vagas\n' +
+        '**`/ranking`** - Ver ranking de vitórias\n' +
+        '**`/comandos`** - Ver esta lista\n',
       inline: false
     });
 
-    // Embed de comandos do dono
-    const embedDono = new EmbedBuilder()
-      .setColor(COLORS.ERROR)
-      .setTitle(`${EMOJIS.SHIELD} Comandos do Dono`)
-      .setDescription('**Apenas o proprietário do bot pode usar estes comandos**')
-      .addFields(
-        {
-          name: '`/painel`',
-          value: '**Descrição:** Abre o painel de controle completo do bot\n**Uso:** `/painel`\n**Onde:** Qualquer canal\n**Funcionalidades:** Configurar canais, cargos, valores, taxa, logs e muito mais',
-          inline: false
-        },
-        {
-          name: '`/mediador adicionar <usuário>`',
-          value: '**Descrição:** Adiciona um mediador por 7 dias\n**Uso:** `/mediador adicionar @usuário`\n**Onde:** Qualquer canal\n**Nota:** Renovação automática 24h antes do vencimento',
-          inline: false
-        },
-        {
-          name: '`/mediador remover <usuário>`',
-          value: '**Descrição:** Remove um mediador\n**Uso:** `/mediador remover @usuário`\n**Onde:** Qualquer canal',
-          inline: false
-        },
-        {
-          name: '`/mediador listar`',
-          value: '**Descrição:** Lista todos os mediadores ativos\n**Uso:** `/mediador listar`\n**Onde:** Qualquer canal\n**Exibe:** Nome, data de adição e data de expiração',
-          inline: false
-        }
-      );
+    // Comandos de Analista
+    if (isAnalista || isDono) {
+      embed.addFields({
+        name: `${EMOJIS.ANALYST} Comandos de Analista`,
+        value: 
+          '**`/analista`** - Entrar/sair de serviço\n' +
+          '**`/ss`** - Solicitar screenshot\n',
+        inline: false
+      });
+    }
 
-    // Embed de comandos de staff
-    const embedStaff = new EmbedBuilder()
-      .setColor(COLORS.WARNING)
+    // Comandos de Mediador
+    if (isMediador || isDono) {
+      embed.addFields({
+        name: `${EMOJIS.MEDIATOR} Comandos de Mediador`,
+        value: 
+          '**`/mediador`** - Entrar/sair de serviço\n' +
+          '**`/fila`** - Criar fila de apostado\n' +
+          '**`/finalizar`** - Finalizar fila\n' +
+          '**`/pix`** - Configurar PIX pessoal\n',
+        inline: false
+      });
+    }
+
+    // Comandos do Dono
+    if (isDono) {
+      embed.addFields({
+        name: `${EMOJIS.SHIELD} Comandos do Dono`,
+        value: 
+          '**`/painel`** - Painel de controle completo\n' +
+          '**`/painelanalista`** - Criar painel de analistas\n' +
+          '**`/painelmediador`** - Criar painel de mediadores\n' +
+          '**`/painelticket`** - Criar painel de tickets\n' +
+          '**`/painelfila`** - Criar painel de filas\n' +
+          '**`/blacklist`** - Gerenciar blacklist\n' +
+          '**`/diagnostico`** - Ver status do sistema\n',
+        inline: false
+      });
+    }
+
+    embed.setFooter({ text: 'INFINITY BOT • Sistema de Apostado' });
+
+    await interaction.editReply({ embeds: [embed] });
+  }
+};
       .setTitle(`${EMOJIS.SHIELD} Comandos de Staff/Admin`)
       .setDescription('**Para membros com cargo de staff ou administrador**')
       .addFields(

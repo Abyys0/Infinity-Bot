@@ -47,6 +47,109 @@ async function handle(interaction) {
     return await interaction.showModal(modal);
   }
 
+  // owner_add_analista
+  if (customId === 'owner_add_analista') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_owner_add_analista')
+      .setTitle('Adicionar Analista');
+
+    const userInput = new TextInputBuilder()
+      .setCustomId('user_id')
+      .setLabel('ID do Usuário')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('123456789012345678')
+      .setRequired(true);
+
+    const tipoInput = new TextInputBuilder()
+      .setCustomId('tipo')
+      .setLabel('Tipo de Analista (mobile ou emulador)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('mobile')
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(userInput),
+      new ActionRowBuilder().addComponents(tipoInput)
+    );
+
+    return await interaction.showModal(modal);
+  }
+
+  // owner_remove_analista
+  if (customId === 'owner_remove_analista') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_owner_remove_analista')
+      .setTitle('Remover Analista');
+
+    const userInput = new TextInputBuilder()
+      .setCustomId('user_id')
+      .setLabel('ID do Usuário')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('123456789012345678')
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(userInput)
+    );
+
+    return await interaction.showModal(modal);
+  }
+
+  // owner_view_analistas
+  if (customId === 'owner_view_analistas') {
+    await interaction.deferReply({ flags: 64 });
+    
+    const analistas = await db.readData('analistas');
+    const analistasAtivos = analistas.filter(a => a.active);
+
+    if (analistasAtivos.length === 0) {
+      return interaction.editReply({
+        embeds: [createInfoEmbed('Analistas', 'Nenhum analista ativo no momento.')]
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(COLORS.PRIMARY)
+      .setTitle(`${EMOJIS.ANALYST} Analistas Ativos`)
+      .setDescription(`Total: ${analistasAtivos.length} analista(s)`)
+      .setTimestamp()
+      .setFooter({ text: 'INFINITY BOT • Analistas' });
+
+    // Separar por tipo
+    const mobile = analistasAtivos.filter(a => a.tipo === 'mobile');
+    const emulador = analistasAtivos.filter(a => a.tipo === 'emulador');
+
+    if (mobile.length > 0) {
+      const listaMobile = mobile.map(a => {
+        const status = a.onDuty ? '🟢 Em Serviço' : '⚪ Fora de Serviço';
+        return `<@${a.userId}> - ${status}`;
+      }).join('\n');
+      
+      embed.addFields({
+        name: '📱 Mobile',
+        value: listaMobile,
+        inline: false
+      });
+    }
+
+    if (emulador.length > 0) {
+      const listaEmulador = emulador.map(a => {
+        const status = a.onDuty ? '🟢 Em Serviço' : '⚪ Fora de Serviço';
+        return `<@${a.userId}> - ${status}`;
+      }).join('\n');
+      
+      embed.addFields({
+        name: '💻 Emulador',
+        value: listaEmulador,
+        inline: false
+      });
+    }
+
+    return await interaction.editReply({
+      embeds: [embed]
+    });
+  }
+
   // owner_config_taxes
   if (customId === 'owner_config_taxes') {
     let config;
@@ -620,6 +723,337 @@ async function handle(interaction) {
       console.error('Erro ao buscar multas:', error);
       await interaction.editReply({
         embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao buscar as multas.')]
+      });
+    }
+  }
+
+  // owner_export_queue_logs
+  if (customId === 'owner_export_queue_logs') {
+    await interaction.deferReply({ flags: 64 });
+    
+    try {
+      const messageLogs = await db.readData('messageLogs');
+      const queues = await db.readData('queues');
+      
+      // Filtrar mensagens de canais de fila
+      const queueChannelIds = queues.map(q => q.channelId);
+      const queueLogs = messageLogs.filter(m => queueChannelIds.includes(m.channelId));
+      
+      if (queueLogs.length === 0) {
+        return interaction.editReply({
+          embeds: [createInfoEmbed('Sem Logs', 'Nenhum log de fila encontrado.')]
+        });
+      }
+      
+      // Gerar conteúdo do arquivo
+      let txtContent = '═══════════════════════════════════════\n';
+      txtContent += '      LOGS DE FILAS - INFINITY BOT\n';
+      txtContent += '═══════════════════════════════════════\n\n';
+      txtContent += `Total de mensagens: ${queueLogs.length}\n`;
+      txtContent += `Data de exportação: ${new Date().toLocaleString('pt-BR')}\n\n`;
+      txtContent += '═══════════════════════════════════════\n\n';
+      
+      // Agrupar por canal
+      const porCanal = {};
+      queueLogs.forEach(log => {
+        if (!porCanal[log.channelId]) {
+          porCanal[log.channelId] = [];
+        }
+        porCanal[log.channelId].push(log);
+      });
+      
+      for (const [channelId, logs] of Object.entries(porCanal)) {
+        const fila = queues.find(q => q.channelId === channelId);
+        txtContent += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        txtContent += `CANAL: ${logs[0].channelName || channelId}\n`;
+        if (fila) {
+          txtContent += `FILA: ${fila.tipo} ${fila.plataforma} - R$ ${fila.valor}\n`;
+          txtContent += `CRIADA EM: ${new Date(fila.criadoEm).toLocaleString('pt-BR')}\n`;
+        }
+        txtContent += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        logs.sort((a, b) => a.timestamp - b.timestamp);
+        
+        logs.forEach(log => {
+          const timestamp = new Date(log.timestamp).toLocaleString('pt-BR');
+          const deleted = log.deleted ? ' [DELETADA]' : '';
+          txtContent += `[${timestamp}] ${log.authorTag}${deleted}:\n`;
+          txtContent += `${log.content || '(sem texto)'}\n`;
+          if (log.attachments.length > 0) {
+            txtContent += `Anexos: ${log.attachments.map(a => a.url).join(', ')}\n`;
+          }
+          txtContent += '\n';
+        });
+      }
+      
+      // Criar buffer
+      const buffer = Buffer.from(txtContent, 'utf-8');
+      const filename = `filas_logs_${Date.now()}.txt`;
+      
+      await interaction.editReply({
+        embeds: [createSuccessEmbed(
+          'Logs Exportados',
+          `📥 **${queueLogs.length}** mensagens de **${Object.keys(porCanal).length}** filas exportadas!`
+        )],
+        files: [{
+          attachment: buffer,
+          name: filename
+        }]
+      });
+      
+    } catch (error) {
+      console.error('Erro ao exportar logs:', error);
+      await interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao exportar os logs.')]
+      });
+    }
+  }
+
+  // owner_export_ticket_logs
+  if (customId === 'owner_export_ticket_logs') {
+    await interaction.deferReply({ flags: 64 });
+    
+    try {
+      const messageLogs = await db.readData('messageLogs');
+      const tickets = await db.readData('tickets');
+      
+      // Filtrar mensagens de canais de ticket
+      const ticketChannelIds = tickets.map(t => t.channelId);
+      const ticketLogs = messageLogs.filter(m => ticketChannelIds.includes(m.channelId));
+      
+      if (ticketLogs.length === 0) {
+        return interaction.editReply({
+          embeds: [createInfoEmbed('Sem Logs', 'Nenhum log de ticket encontrado.')]
+        });
+      }
+      
+      // Gerar conteúdo do arquivo
+      let txtContent = '═══════════════════════════════════════\n';
+      txtContent += '     LOGS DE TICKETS - INFINITY BOT\n';
+      txtContent += '═══════════════════════════════════════\n\n';
+      txtContent += `Total de mensagens: ${ticketLogs.length}\n`;
+      txtContent += `Data de exportação: ${new Date().toLocaleString('pt-BR')}\n\n`;
+      txtContent += '═══════════════════════════════════════\n\n';
+      
+      // Agrupar por canal
+      const porCanal = {};
+      ticketLogs.forEach(log => {
+        if (!porCanal[log.channelId]) {
+          porCanal[log.channelId] = [];
+        }
+        porCanal[log.channelId].push(log);
+      });
+      
+      for (const [channelId, logs] of Object.entries(porCanal)) {
+        const ticket = tickets.find(t => t.channelId === channelId);
+        txtContent += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        txtContent += `CANAL: ${logs[0].channelName || channelId}\n`;
+        if (ticket) {
+          txtContent += `TICKET: ${ticket.tipo}\n`;
+          txtContent += `USUÁRIO: ${ticket.userId}\n`;
+          txtContent += `CRIADO EM: ${new Date(ticket.createdAt).toLocaleString('pt-BR')}\n`;
+          if (ticket.status === 'closed') {
+            txtContent += `FECHADO EM: ${new Date(ticket.closedAt).toLocaleString('pt-BR')}\n`;
+          }
+        }
+        txtContent += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        logs.sort((a, b) => a.timestamp - b.timestamp);
+        
+        logs.forEach(log => {
+          const timestamp = new Date(log.timestamp).toLocaleString('pt-BR');
+          const deleted = log.deleted ? ' [DELETADA]' : '';
+          txtContent += `[${timestamp}] ${log.authorTag}${deleted}:\n`;
+          txtContent += `${log.content || '(sem texto)'}\n`;
+          if (log.attachments.length > 0) {
+            txtContent += `Anexos: ${log.attachments.map(a => a.url).join(', ')}\n`;
+          }
+          txtContent += '\n';
+        });
+      }
+      
+      // Criar buffer
+      const buffer = Buffer.from(txtContent, 'utf-8');
+      const filename = `tickets_logs_${Date.now()}.txt`;
+      
+      await interaction.editReply({
+        embeds: [createSuccessEmbed(
+          'Logs Exportados',
+          `📥 **${ticketLogs.length}** mensagens de **${Object.keys(porCanal).length}** tickets exportadas!`
+        )],
+        files: [{
+          attachment: buffer,
+          name: filename
+        }]
+      });
+      
+    } catch (error) {
+      console.error('Erro ao exportar logs:', error);
+      await interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao exportar os logs.')]
+      });
+    }
+  }
+
+  // owner_export_all_logs
+  if (customId === 'owner_export_all_logs') {
+    await interaction.deferReply({ flags: 64 });
+    
+    try {
+      const messageLogs = await db.readData('messageLogs');
+      
+      if (messageLogs.length === 0) {
+        return interaction.editReply({
+          embeds: [createInfoEmbed('Sem Logs', 'Nenhum log encontrado.')]
+        });
+      }
+      
+      // Gerar conteúdo do arquivo
+      let txtContent = '═══════════════════════════════════════\n';
+      txtContent += '    TODOS OS LOGS - INFINITY BOT\n';
+      txtContent += '═══════════════════════════════════════\n\n';
+      txtContent += `Total de mensagens: ${messageLogs.length}\n`;
+      txtContent += `Data de exportação: ${new Date().toLocaleString('pt-BR')}\n\n`;
+      txtContent += '═══════════════════════════════════════\n\n';
+      
+      // Agrupar por canal
+      const porCanal = {};
+      messageLogs.forEach(log => {
+        if (!porCanal[log.channelId]) {
+          porCanal[log.channelId] = [];
+        }
+        porCanal[log.channelId].push(log);
+      });
+      
+      for (const [channelId, logs] of Object.entries(porCanal)) {
+        txtContent += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        txtContent += `CANAL: ${logs[0].channelName || channelId}\n`;
+        txtContent += `MENSAGENS: ${logs.length}\n`;
+        txtContent += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        logs.sort((a, b) => a.timestamp - b.timestamp);
+        
+        logs.forEach(log => {
+          const timestamp = new Date(log.timestamp).toLocaleString('pt-BR');
+          const deleted = log.deleted ? ' [DELETADA]' : '';
+          txtContent += `[${timestamp}] ${log.authorTag}${deleted}:\n`;
+          txtContent += `${log.content || '(sem texto)'}\n`;
+          if (log.attachments.length > 0) {
+            txtContent += `Anexos: ${log.attachments.map(a => a.url).join(', ')}\n`;
+          }
+          txtContent += '\n';
+        });
+      }
+      
+      // Criar buffer
+      const buffer = Buffer.from(txtContent, 'utf-8');
+      const filename = `all_logs_${Date.now()}.txt`;
+      
+      await interaction.editReply({
+        embeds: [createSuccessEmbed(
+          'Logs Exportados',
+          `📥 **${messageLogs.length}** mensagens de **${Object.keys(porCanal).length}** canais exportadas!`
+        )],
+        files: [{
+          attachment: buffer,
+          name: filename
+        }]
+      });
+      
+    } catch (error) {
+      console.error('Erro ao exportar logs:', error);
+      await interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao exportar os logs.')]
+      });
+    }
+  }
+
+  // owner_ver_faturamento
+  if (customId === 'owner_ver_faturamento') {
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      const config = await db.readData('config');
+      const filas = await db.readData('filas');
+      const mediadores = await db.readData('mediadores');
+
+      const taxaMediador = config.taxes?.mediador || 10;
+
+      // Calcular faturamento de cada mediador
+      const faturamentoPorMediador = {};
+
+      for (const fila of filas) {
+        if (fila.status === 'completed' && fila.mediadorId) {
+          if (!faturamentoPorMediador[fila.mediadorId]) {
+            faturamentoPorMediador[fila.mediadorId] = {
+              totalFilas: 0,
+              valorTotal: 0,
+              taxaTotal: 0
+            };
+          }
+
+          const valorFila = fila.valor || 0;
+          const jogadores = (fila.time1?.length || 0) + (fila.time2?.length || 0);
+          const valorPorTime = (valorFila * (jogadores / 2));
+          const taxa = Math.ceil(valorPorTime * (taxaMediador / 100));
+
+          faturamentoPorMediador[fila.mediadorId].totalFilas++;
+          faturamentoPorMediador[fila.mediadorId].valorTotal += valorPorTime * 2;
+          faturamentoPorMediador[fila.mediadorId].taxaTotal += taxa;
+        }
+      }
+
+      if (Object.keys(faturamentoPorMediador).length === 0) {
+        return interaction.editReply({
+          embeds: [createInfoEmbed('Sem Dados', 'Ainda não há faturamento registrado.')]
+        });
+      }
+
+      // Criar embed
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.SUCCESS)
+        .setTitle('💰 Faturamento dos Mediadores')
+        .setDescription(`**Taxa configurada:** ${taxaMediador}%\n\n`)
+        .setTimestamp()
+        .setFooter({ text: 'INFINITY BOT • Faturamento' });
+
+      let totalGeral = 0;
+      let totalTaxas = 0;
+
+      // Adicionar fields para cada mediador
+      for (const [mediadorId, dados] of Object.entries(faturamentoPorMediador)) {
+        const mediador = mediadores.find(m => m.userId === mediadorId);
+        const nome = mediador ? `<@${mediadorId}>` : `ID: ${mediadorId}`;
+
+        totalGeral += dados.valorTotal;
+        totalTaxas += dados.taxaTotal;
+
+        embed.addFields({
+          name: `${EMOJIS.MEDIATOR} ${nome}`,
+          value: 
+            `🎮 **Filas:** ${dados.totalFilas}\n` +
+            `💵 **Valor Total:** R$ ${dados.valorTotal.toFixed(2)}\n` +
+            `💰 **Taxa (${taxaMediador}%):** R$ ${dados.taxaTotal.toFixed(2)}`,
+          inline: true
+        });
+      }
+
+      // Adicionar totais
+      embed.addFields({
+        name: '📊 TOTAIS GERAIS',
+        value: 
+          `💵 **Valor Total Movimentado:** R$ ${totalGeral.toFixed(2)}\n` +
+          `💰 **Total em Taxas:** R$ ${totalTaxas.toFixed(2)}\n` +
+          `📈 **Lucro Líquido (Casa):** R$ ${(totalGeral - totalTaxas).toFixed(2)}`,
+        inline: false
+      });
+
+      await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+      console.error('Erro ao calcular faturamento:', error);
+      await interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao calcular o faturamento.')]
       });
     }
   }

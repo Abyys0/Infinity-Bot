@@ -37,15 +37,34 @@ module.exports = {
           .setStyle(ButtonStyle.Success)
           .setEmoji(EMOJIS.MEDIATOR),
         new ButtonBuilder()
+          .setCustomId('owner_add_analista')
+          .setLabel('Adicionar Analista')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji(EMOJIS.ANALYST),
+        new ButtonBuilder()
           .setCustomId('owner_config_taxes')
           .setLabel('Configurar Taxas')
           .setStyle(ButtonStyle.Primary)
-          .setEmoji(EMOJIS.MONEY),
+          .setEmoji(EMOJIS.MONEY)
+      );
+
+    const row1_5 = new ActionRowBuilder()
+      .addComponents(
         new ButtonBuilder()
           .setCustomId('owner_config_roles')
           .setLabel('Configurar Cargos')
           .setStyle(ButtonStyle.Primary)
-          .setEmoji(EMOJIS.TEAM)
+          .setEmoji(EMOJIS.TEAM),
+        new ButtonBuilder()
+          .setCustomId('owner_remove_analista')
+          .setLabel('Remover Analista')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji(EMOJIS.ERROR),
+        new ButtonBuilder()
+          .setCustomId('owner_view_analistas')
+          .setLabel('Ver Analistas')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji(EMOJIS.LIST)
       );
 
     const row2 = new ActionRowBuilder()
@@ -124,9 +143,37 @@ module.exports = {
           .setEmoji('📊')
       );
 
+    const row6 = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('owner_export_queue_logs')
+          .setLabel('Exportar Logs de Filas')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('📥'),
+        new ButtonBuilder()
+          .setCustomId('owner_export_ticket_logs')
+          .setLabel('Exportar Logs de Tickets')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('📥'),
+        new ButtonBuilder()
+          .setCustomId('owner_export_all_logs')
+          .setLabel('Exportar Todos os Logs')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('📦')
+      );
+
+    const row7 = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('owner_ver_faturamento')
+          .setLabel('Ver Faturamento Mediadores')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('💰')
+      );
+
     await interaction.editReply({
       embeds: [embed],
-      components: [row1, row2, row3, row4, row5]
+      components: [row1, row1_5, row2, row3, row4, row5, row6, row7]
     });
   }
 };

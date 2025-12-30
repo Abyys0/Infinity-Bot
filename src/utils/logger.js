@@ -85,8 +85,25 @@ async function logMediador(client, action, userId, userTag, executorTag) {
  * Log de analista
  */
 async function logAnalista(client, action, userId, userTag, tipo, executorTag) {
-  const emoji = action === 'enter' ? EMOJIS.ONLINE : EMOJIS.OFFLINE;
-  const actionText = action === 'enter' ? 'entrou em serviço' : 'saiu de serviço';
+  let emoji, actionText;
+  
+  if (action === 'enter') {
+    emoji = EMOJIS.ONLINE;
+    actionText = 'entrou em serviço';
+  } else if (action === 'exit') {
+    emoji = EMOJIS.OFFLINE;
+    actionText = 'saiu de serviço';
+  } else if (action === 'add') {
+    emoji = EMOJIS.SUCCESS;
+    actionText = 'adicionado ao sistema';
+  } else if (action === 'remove') {
+    emoji = EMOJIS.ERROR;
+    actionText = 'removido do sistema';
+  } else {
+    emoji = EMOJIS.WARNING;
+    actionText = action;
+  }
+  
   const message = `${emoji} Analista ${actionText}: ${userTag} (${userId}) | Tipo: ${tipo} | Executor: ${executorTag}`;
   await sendLog(client, message);
 }
