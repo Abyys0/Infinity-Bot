@@ -30,7 +30,7 @@ module.exports = {
 
     // Criar embed do painel
     const embed = new EmbedBuilder()
-      .setTitle(`${EMOJIS.ANALYST} Painel de Solicitação de Analista`)
+      .setTitle(`${EMOJIS.ANALYST} Painel de Analistas`)
       .setDescription(
         '**Precisa de um analista para verificar uma partida?**\n\n' +
         `${EMOJIS.INFO} Clique no botão abaixo para chamar um analista disponível.\n\n` +
@@ -39,6 +39,7 @@ module.exports = {
         '• Verificação de resultado\n' +
         '• Análise de SS (screenshot)\n' +
         '• Disputas de partidas\n\n' +
+        `💰 **Analistas:** Configure seu PIX para receber pagamentos\n` +
         `${EMOJIS.SHIELD} Um analista será notificado e entrará em contato.`
       )
       .setColor(COLORS.PRIMARY)
@@ -46,7 +47,7 @@ module.exports = {
       .setFooter({ text: 'INFINITY BOT • Sistema de Analistas' });
 
     // Botões para chamar analista (Mobile/Emulador)
-    const row = new ActionRowBuilder()
+    const row1 = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
           .setCustomId('chamar_analista_mobile')
@@ -60,10 +61,19 @@ module.exports = {
           .setEmoji('💻')
       );
 
+    const row2 = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('analista_configurar_pix')
+          .setLabel('Configurar Meu PIX')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('💰')
+      );
+
     try {
       await canal.send({
         embeds: [embed],
-        components: [row]
+        components: [row1, row2]
       });
 
       await interaction.editReply({

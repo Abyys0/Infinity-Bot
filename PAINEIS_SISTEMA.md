@@ -33,6 +33,13 @@ Painel fixo para mediadores controlarem sua entrada e saída de serviço.
 - Mostra há quanto tempo estão online
 - Exibe total de mediadores disponíveis
 
+#### 💰 Configurar Meu PIX
+- Permite mediadores configurarem seu PIX pessoal
+- PIX será usado para receber porcentagem das filas atendidas
+- Campos: Tipo de Chave, Chave PIX, Nome, QR Code (opcional)
+- Salvo no perfil do mediador
+- Quando o mediador atende uma fila, o PIX enviado será o dele
+
 ### Verificações de Segurança
 1. ✅ Usuário deve estar registrado em `mediadores.json` com `active: true`
 2. ✅ Não pode entrar em serviço com multa pendente
@@ -107,6 +114,14 @@ Painel para mediadores solicitarem analistas para verificação de partidas.
 - Seleciona aleatoriamente entre os disponíveis
 - Envia DM para o analista escolhido
 - Notifica quem solicitou
+- **Se o analista tem PIX configurado, envia as informações no canal**
+
+#### 💰 Configurar Meu PIX
+- Permite analistas configurarem seu PIX pessoal
+- PIX será usado para receber pagamento pelas análises
+- Campos: Tipo de Chave, Chave PIX, Nome, QR Code (opcional)
+- Salvo no perfil do analista
+- Quando chamado, o PIX dele é automaticamente enviado no canal
 
 ### Verificações de Segurança
 1. ✅ Apenas mediadores podem usar o painel
@@ -167,7 +182,14 @@ Painel para mediadores solicitarem analistas para verificação de partidas.
   "expiresAt": 1234567890,
   "active": true,
   "onDuty": false,
-  "renewalNotified": false
+  "renewalNotified": false,
+  "pix": {
+    "tipoChave": "CPF",
+    "chave": "123.456.789-00",
+    "nome": "João Silva",
+    "imagemUrl": "https://exemplo.com/qr.png",
+    "configuradoEm": 1234567890
+  }
 }
 ```
 
@@ -199,7 +221,14 @@ Painel para mediadores solicitarem analistas para verificação de partidas.
   "active": true,
   "onDuty": false,
   "addedBy": "111111111",
-  "addedAt": 1234567890
+  "addedAt": 1234567890,
+  "pix": {
+    "tipoChave": "Email",
+    "chave": "analista@email.com",
+    "nome": "Maria Santos",
+    "imagemUrl": "https://exemplo.com/qr.png",
+    "configuradoEm": 1234567890
+  }
 }
 ```
 
@@ -249,6 +278,14 @@ Painel para mediadores solicitarem analistas para verificação de partidas.
 ---
 
 ## 🚀 Melhorias Implementadas
+
+### v2.1 - Sistema de PIX Individual
+- ✅ Mediadores podem configurar PIX pessoal no painel
+- ✅ Analistas podem configurar PIX pessoal no painel
+- ✅ PIX do mediador é enviado quando ele atende uma fila
+- ✅ PIX do analista é enviado quando ele é chamado
+- ✅ Sistema diferencia entre PIX do dono e PIX pessoal
+- ✅ QR Code opcional para ambos
 
 ### v2.0 - Sistema de Atendimento Único
 - ✅ Apenas um mediador pode atender cada fila

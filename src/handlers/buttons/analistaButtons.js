@@ -1,13 +1,59 @@
 // Handler de botões do painel de analista
 
+const { EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const { createSuccessEmbed, createErrorEmbed, createInfoEmbed } = require('../../utils/embeds');
-const { ANALYST_TYPES, EMOJIS } = require('../../config/constants');
+const { ANALYST_TYPES, EMOJIS, COLORS } = require('../../config/constants');
 const permissions = require('../../config/permissions');
 const db = require('../../database');
 const logger = require('../../utils/logger');
 
 async function handle(interaction) {
   const customId = interaction.customId;
+
+  // analista_configurar_pix - Qualquer um pode configurar
+  if (customId === 'analista_configurar_pix') {
+    // Criar modal para configurar PIX
+    const modal = new ModalBuilder()
+      .setCustomId('modal_analista_pix')
+      .setTitle('Configurar PIX de Analista');
+
+    const tipoChaveInput = new TextInputBuilder()
+      .setCustomId('tipo_chave')
+      .setLabel('Tipo de Chave PIX')
+      .setPlaceholder('CPF, CNPJ, Email, Telefone ou Chave Aleatória')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const chaveInput = new TextInputBuilder()
+      .setCustomId('chave')
+      .setLabel('Chave PIX')
+      .setPlaceholder('Digite sua chave PIX')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const nomeInput = new TextInputBuilder()
+      .setCustomId('nome')
+      .setLabel('Nome do Titular')
+      .setPlaceholder('Nome completo')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const imagemInput = new TextInputBuilder()
+      .setCustomId('imagem')
+      .setLabel('URL da Imagem QR Code (Opcional)')
+      .setPlaceholder('https://exemplo.com/qrcode.png')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
+
+    const row1 = new ActionRowBuilder().addComponents(tipoChaveInput);
+    const row2 = new ActionRowBuilder().addComponents(chaveInput);
+    const row3 = new ActionRowBuilder().addComponents(nomeInput);
+    const row4 = new ActionRowBuilder().addComponents(imagemInput);
+
+    modal.addComponents(row1, row2, row3, row4);
+
+    return interaction.showModal(modal);
+  }
 
   // Verificar se é mediador
   const temPermissao = await permissions.isMediadorOrAbove(interaction.member);
@@ -77,6 +123,30 @@ async function handle(interaction) {
 
     await logger.logSS(interaction.client, 'call', interaction.user.id, interaction.user.tag, analistaMember.user.id, analistaMember.user.tag, tipo);
 
+    // Se o analista tem PIX configurado, enviar informações
+    if (analistaEscolhido.pix) {
+      const pixEmbed = new EmbedBuilder()
+        .setTitle(`${EMOJIS.MONEY} PIX do Analista`)
+        .setDescription(`**Informações de pagamento para ${analistaMember}**\n\nEnvie o comprovante após realizar o pagamento da análise!`)
+        .addFields(
+          { name: '📝 Tipo de Chave', value: analistaEscolhido.pix.tipoChave, inline: true },
+          { name: '🔑 Chave PIX', value: `\`${analistaEscolhido.pix.chave}\``, inline: true },
+          { name: '👤 Nome', value: analistaEscolhido.pix.nome, inline: true }
+        )
+        .setColor(COLORS.PRIMARY)
+        .setTimestamp();
+
+      // Se houver imagem QR Code
+      if (analistaEscolhido.pix.imagemUrl) {
+        pixEmbed.setImage(analistaEscolhido.pix.imagemUrl);
+      }
+
+      // Enviar embed do PIX no canal
+      await interaction.channel.send({
+        embeds: [pixEmbed]
+      });
+    }
+
     // Responder confirmando
     await interaction.editReply({
       embeds: [createSuccessEmbed(
@@ -84,7 +154,8 @@ async function handle(interaction) {
         `${EMOJIS.SUCCESS} **Analista chamado com sucesso!**\n\n` +
         `${tipoEmoji} **Tipo:** ${tipoNome}\n` +
         `👨‍💼 **Analista:** ${analistaMember}\n\n` +
-        `${EMOJIS.INFO} O analista foi notificado e entrará em contato.`
+        `${EMOJIS.INFO} O analista foi notificado e entrará em contato.` +
+        (analistaEscolhido.pix ? `\n\n${EMOJIS.MONEY} Informações de pagamento enviadas no canal.` : '')
       )]
     });
   } catch (error) {

@@ -1,6 +1,6 @@
 // Handler de botões do painel de mediador
 
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const { createSuccessEmbed, createErrorEmbed, createInfoEmbed } = require('../../utils/embeds');
 const { EMOJIS, COLORS } = require('../../config/constants');
 const permissions = require('../../config/permissions');
@@ -18,6 +18,51 @@ async function handle(interaction) {
   
   const mediador = mediadores.find(m => m.userId === interaction.user.id && m.active);
   console.log('[MEDIADOR PAINEL] Mediador encontrado para', interaction.user.id, ':', mediador ? 'SIM' : 'NÃO');
+
+  // mediador_configurar_pix - Não precisa verificar se está registrado
+  if (customId === 'mediador_configurar_pix') {
+    // Criar modal para configurar PIX
+    const modal = new ModalBuilder()
+      .setCustomId('modal_mediador_pix')
+      .setTitle('Configurar PIX de Mediador');
+
+    const tipoChaveInput = new TextInputBuilder()
+      .setCustomId('tipo_chave')
+      .setLabel('Tipo de Chave PIX')
+      .setPlaceholder('CPF, CNPJ, Email, Telefone ou Chave Aleatória')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const chaveInput = new TextInputBuilder()
+      .setCustomId('chave')
+      .setLabel('Chave PIX')
+      .setPlaceholder('Digite sua chave PIX')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const nomeInput = new TextInputBuilder()
+      .setCustomId('nome')
+      .setLabel('Nome do Titular')
+      .setPlaceholder('Nome completo')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const imagemInput = new TextInputBuilder()
+      .setCustomId('imagem')
+      .setLabel('URL da Imagem QR Code (Opcional)')
+      .setPlaceholder('https://exemplo.com/qrcode.png')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
+
+    const row1 = new ActionRowBuilder().addComponents(tipoChaveInput);
+    const row2 = new ActionRowBuilder().addComponents(chaveInput);
+    const row3 = new ActionRowBuilder().addComponents(nomeInput);
+    const row4 = new ActionRowBuilder().addComponents(imagemInput);
+
+    modal.addComponents(row1, row2, row3, row4);
+
+    return interaction.showModal(modal);
+  }
 
   if (!mediador) {
     return interaction.reply({

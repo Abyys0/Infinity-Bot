@@ -46,7 +46,7 @@ module.exports = {
       .setFooter({ text: 'INFINITY BOT • Sistema de Mediadores' });
 
     // Botões para entrar/sair
-    const row = new ActionRowBuilder()
+    const row1 = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
           .setCustomId('mediador_entrar_painel')
@@ -65,10 +65,19 @@ module.exports = {
           .setEmoji('📊')
       );
 
+    const row2 = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('mediador_configurar_pix')
+          .setLabel('Configurar Meu PIX')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('💰')
+      );
+
     try {
       const message = await canal.send({
         embeds: [embed],
-        components: [row]
+        components: [row1, row2]
       });
 
       // Salvar messageId para atualizar depois

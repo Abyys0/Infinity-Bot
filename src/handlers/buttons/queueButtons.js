@@ -29,9 +29,28 @@ async function processarFilaConfirmada(interaction, fila, filaId) {
     })
   );
 
-  // Buscar dados do PIX
-  const pixData = await db.readData('pix');
-  const pixInfo = pixData && pixData.length > 0 ? pixData[0] : null;
+  // Buscar dados do PIX - priorizar PIX do mediador que está atendendo
+  let pixInfo = null;
+  let pixTipo = 'dono'; // 'dono' ou 'mediador'
+  
+  // Se há mediador atendendo, usar o PIX dele
+  if (fila.mediadorId && fila.mediadorAtendeu) {
+    const mediadores = await db.readData('mediadores');
+    const mediadorAtendendo = mediadores.find(m => m.userId === fila.mediadorId && m.active);
+    
+    if (mediadorAtendendo && mediadorAtendendo.pix) {
+      pixInfo = mediadorAtendendo.pix;
+      pixTipo = 'mediador';
+      console.log(`[FILA] Usando PIX do mediador ${fila.mediadorId}`);
+    }
+  }
+  
+  // Se não tem PIX do mediador, usar PIX do dono
+  if (!pixInfo) {
+    const pixData = await db.readData('pix');
+    pixInfo = pixData && pixData.length > 0 ? pixData[0] : null;
+    console.log('[FILA] Usando PIX do dono');
+  }
 
   // Calcular valores
   const valorPorJogador = fila.valor;
@@ -86,9 +105,13 @@ async function processarFilaConfirmada(interaction, fila, filaId) {
 
   // Adicionar informações do PIX se disponível
   if (pixInfo) {
+    const pixDescricao = pixTipo === 'mediador' 
+      ? `**Pagamento para o Mediador**\n\nEnvie o comprovante após realizar o pagamento!`
+      : `**Pagamento para a Casa**\n\nEnvie o comprovante após realizar o pagamento!`;
+    
     const pixEmbed = new EmbedBuilder()
       .setTitle(`${EMOJIS.MONEY} Informações de Pagamento PIX`)
-      .setDescription('**Envie o comprovante após realizar o pagamento!**')
+      .setDescription(pixDescricao)
       .addFields(
         { name: '📝 Tipo de Chave', value: pixInfo.tipoChave || 'Não configurado', inline: true },
         { name: '🔑 Chave PIX', value: `\`${pixInfo.chave || 'Não configurado'}\``, inline: true },

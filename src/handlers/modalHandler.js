@@ -6,6 +6,7 @@ const { createErrorEmbed } = require('../utils/embeds');
 const ownerPanelModals = require('./modals/ownerPanel');
 const blacklistModals = require('./modals/blacklist');
 const pixModals = require('./modals/pix');
+const pixPessoalModals = require('./modals/pixPessoal');
 
 /**
  * Processa envios de modais
@@ -27,6 +28,11 @@ async function handleModal(interaction) {
     // Modais de PIX
     if (customId.startsWith('modal_pix_')) {
       return await pixModals.handle(interaction);
+    }
+
+    // Modais de PIX pessoal (mediador e analista)
+    if (customId === 'modal_mediador_pix' || customId === 'modal_analista_pix') {
+      return await pixPessoalModals.handle(interaction);
     }
 
     // Modal não reconhecido
