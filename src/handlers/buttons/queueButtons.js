@@ -412,8 +412,10 @@ module.exports = {
       time2,
       status: 'iniciada',
       iniciadaEm: Date.now(),
-      mediadorId: null, // Nenhum mediador ainda
-      mediadorAtendeu: false
+      mediadorId: null,
+      mediadorAtendeu: false,
+      confirmacoesTime1: [],
+      confirmacoesTime2: []
     }));
 
     // Atualizar mensagem com botões de confirmação
@@ -462,6 +464,49 @@ module.exports = {
       embeds: [newEmbed], 
       components: [row1, row2] 
     });
+
+    // ENVIAR DM PARA TODOS OS JOGADORES
+    const todosJogadores = time1.concat(time2);
+    const embedDM = new EmbedBuilder()
+      .setTitle('🎮 Fila Formada!')
+      .setDescription(
+        `Sua fila **${fila.tipo} ${fila.plataforma}** está completa!\n\n` +
+        `**Valor:** R$ ${fila.valor}\n` +
+        `**Canal:** <#${fila.channelId}>\n\n` +
+        `${EMOJIS.WARNING} **Confirme sua participação clicando nos botões no canal da fila!**\n\n` +
+        `**Seu time:** ${time1.includes(interaction.user.id) ? '🔥 Gelo Infinito' : '❄️ Gelo Normal'}`
+      )
+      .setColor(COLORS.PRIMARY)
+      .setTimestamp();
+
+    for (const userId of todosJogadores) {
+      try {
+        const user = await interaction.client.users.fetch(userId);
+        const time = time1.includes(userId) ? 'Gelo Infinito 🔥' : 'Gelo Normal ❄️';
+        
+        const dmEmbed = new EmbedBuilder()
+          .setTitle('🎮 Fila Formada!')
+          .setDescription(
+            `Sua fila **${fila.tipo} ${fila.plataforma}** está completa!\n\n` +
+            `**Valor:** R$ ${fila.valor}\n` +
+            `**Seu time:** ${time}\n` +
+            `**Canal:** <#${fila.channelId}>\n\n` +
+            `${EMOJIS.WARNING} **IMPORTANTE:**\n` +
+            `Vá até o canal da fila e clique no botão do seu time para confirmar!\n\n` +
+            `⏰ Aguardando confirmação de todos os jogadores...`
+          )
+          .setColor(time1.includes(userId) ? COLORS.SUCCESS : COLORS.SECONDARY)
+          .setTimestamp();
+
+        await user.send({ embeds: [dmEmbed] });
+        logger.log(`DM enviada para ${user.tag} sobre fila ${filaId}`);
+      } catch (error) {
+        logger.error(`Erro ao enviar DM para ${userId}:`, error);
+        // Continuar mesmo se falhar enviar DM
+      }
+    }
+
+    logger.log(`Fila ${filaId} iniciada. DMs enviadas para ${todosJogadores.length} jogadores.`);
   },
 
   /**
