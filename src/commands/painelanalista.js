@@ -45,14 +45,19 @@ module.exports = {
       .setTimestamp()
       .setFooter({ text: 'INFINITY BOT • Sistema de Analistas' });
 
-    // Botão para chamar analista
+    // Botões para chamar analista (Mobile/Emulador)
     const row = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
-          .setCustomId('chamar_analista_painel')
-          .setLabel('Chamar Analista')
+          .setCustomId('chamar_analista_mobile')
+          .setLabel('Chamar Analista Mobile')
           .setStyle(ButtonStyle.Primary)
-          .setEmoji(EMOJIS.ANALYST)
+          .setEmoji('📱'),
+        new ButtonBuilder()
+          .setCustomId('chamar_analista_emulador')
+          .setLabel('Chamar Analista Emulador')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('💻')
       );
 
     try {

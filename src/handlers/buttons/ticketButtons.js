@@ -50,21 +50,102 @@ async function handle(interaction) {
     }
   }
 
-  // ticket_close
-  if (customId === 'ticket_close') {
-    // Verificar se pode fechar (usuário ou atendente)
-    const canClose = await permissions.canAttendTickets(interaction.member) || 
-                     await permissions.isOwner(interaction.user.id, interaction.member);
+  // ticket_atender
+  if (customId === 'ticket_atender') {
+    // Verificar se pode atender tickets
+    const canAttend = await permissions.canAttendTickets(interaction.member) || 
+                      await permissions.isOwner(interaction.user.id, interaction.member);
 
-    // Verificar se é o dono do ticket
+    if (!canAttend) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Sem Permissão', 'Apenas atendentes podem atender tickets.')],
+        flags: 64
+      });
+    }
+
     const db = require('../../database');
     const ticket = await db.findItem('tickets', t => t.channelId === interaction.channel.id);
-    
-    const isOwner = ticket && ticket.userId === interaction.user.id;
 
-    if (!canClose && !isOwner) {
+    if (!ticket) {
       return interaction.reply({
-        embeds: [createErrorEmbed('Sem Permissão', 'Apenas o criador do ticket ou atendentes podem fechá-lo.')],
+        embeds: [createErrorEmbed('Ticket Não Encontrado', 'Este canal não é um ticket válido.')],
+        flags: 64
+      });
+    }
+
+    if (ticket.atendidoPor) {
+      const atendente = await interaction.guild.members.fetch(ticket.atendidoPor).catch(() => null);
+      return interaction.reply({
+        embeds: [createErrorEmbed(
+          'Ticket Já Atendido',
+          `Este ticket já está sendo atendido por ${atendente || 'um atendente'}.`
+        )],
+        flags: 64
+      });
+    }
+
+    // Atualizar ticket
+    await db.updateItem('tickets', t => t.channelId === interaction.channel.id, t => ({
+      ...t,
+      atendidoPor: interaction.user.id,
+      atendidoEm: Date.now()
+    }));
+
+    // Remover botão de atender
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+    const message = await interaction.channel.messages.fetch({ limit: 10 });
+    const ticketMessage = message.find(m => m.author.bot && m.components.length > 0);
+
+    if (ticketMessage) {
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('ticket_close')
+            .setLabel('Fechar Ticket')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji(EMOJIS.ERROR)
+        );
+
+      const embed = ticketMessage.embeds[0];
+      const newEmbed = new EmbedBuilder(embed.data)
+        .addFields({ name: '✋ Atendido por', value: `${interaction.user}`, inline: true });
+
+      await ticketMessage.edit({ embeds: [newEmbed], components: [row] });
+    }
+
+    await interaction.reply({
+      embeds: [createSuccessEmbed(
+        'Ticket Atendido',
+        `${EMOJIS.SUCCESS} Você está atendendo este ticket!\n\nApenas você pode fechá-lo.`
+      )]
+    });
+  }
+
+  // ticket_close
+  if (customId === 'ticket_close') {
+    const db = require('../../database');
+    const ticket = await db.findItem('tickets', t => t.channelId === interaction.channel.id);
+
+    if (!ticket) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Ticket Não Encontrado', 'Este canal não é um ticket válido.')],
+        flags: 64
+      });
+    }
+
+    // Verificar se pode fechar
+    const isCreator = ticket.userId === interaction.user.id;
+    const isAttendant = ticket.atendidoPor === interaction.user.id;
+    const isOwner = await permissions.isOwner(interaction.user.id, interaction.member);
+
+    if (!isCreator && !isAttendant && !isOwner) {
+      return interaction.reply({
+        embeds: [createErrorEmbed(
+          'Sem Permissão',
+          ticket.atendidoPor
+            ? 'Apenas o criador do ticket, o atendente ou donos podem fechá-lo.'
+            : 'Apenas o criador do ticket ou donos podem fechá-lo.'
+        )],
         flags: 64
       });
     }

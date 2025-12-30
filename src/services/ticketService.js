@@ -105,9 +105,14 @@ async function createTicket(interaction, tipo, assunto) {
       .setTimestamp()
       .setFooter({ text: 'INFINITY BOT • Sistema de Tickets' });
 
-    // Botão de fechar
+    // Botões de ação
     const row = new ActionRowBuilder()
       .addComponents(
+        new ButtonBuilder()
+          .setCustomId('ticket_atender')
+          .setLabel('Atender Ticket')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('✋'),
         new ButtonBuilder()
           .setCustomId('ticket_close')
           .setLabel('Fechar Ticket')
@@ -136,6 +141,8 @@ async function createTicket(interaction, tipo, assunto) {
       assunto,
       status: TICKET_STATUS.OPEN,
       createdAt: Date.now(),
+      atendidoPor: null, // Quem atendeu o ticket
+      atendidoEm: null,  // Quando foi atendido
       messages: []
     };
 

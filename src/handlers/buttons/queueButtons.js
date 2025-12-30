@@ -137,6 +137,16 @@ module.exports = {
   async handle(interaction) {
     const customId = interaction.customId;
 
+    // entrar_fila_FILAID - Novo sistema
+    if (customId.startsWith('entrar_fila_')) {
+      return await this.handleEntrarFila(interaction);
+    }
+
+    // sair_fila_FILAID - Novo sistema
+    if (customId.startsWith('sair_fila_')) {
+      return await this.handleSairFila(interaction);
+    }
+
     // confirmar_pagamento_FILAID
     if (customId.startsWith('confirmar_pagamento_')) {
       return await this.handleConfirmarPagamento(interaction);
@@ -160,6 +170,184 @@ module.exports = {
     await interaction.reply({
       content: '❌ Botão não reconhecido.',
       flags: 64
+    });
+  },
+
+  /**
+   * Handler para entrar na fila
+   */
+  async handleEntrarFila(interaction) {
+    const { temMultaPendente, getMultaPendente } = require('../../services/multaService');
+    const permissions = require('../../config/permissions');
+    
+    const filaId = interaction.customId.replace('entrar_fila_', '');
+    
+    await interaction.deferReply({ flags: 64 });
+
+    // Verificar multa
+    if (await temMultaPendente(interaction.user.id)) {
+      const multa = await getMultaPendente(interaction.user.id);
+      return interaction.editReply({
+        embeds: [createErrorEmbed(
+          '💸 Multa Pendente',
+          `Você possui uma multa pendente.\n\n` +
+          `**Valor:** R$ ${multa.valor}\n` +
+          `**Canal:** <#${multa.canalId}>`
+        )]
+      });
+    }
+
+    // Verificar blacklist
+    if (await permissions.isBlacklisted(interaction.user.id)) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('🚫 Blacklist', 'Você está na blacklist.')]
+      });
+    }
+
+    const filas = await db.readData('filas');
+    const fila = filas.find(f => f.id === filaId);
+
+    if (!fila) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Fila Não Encontrada', 'Esta fila não existe mais.')]
+      });
+    }
+
+    // Verificar se já está na fila
+    if (fila.jogadores.includes(interaction.user.id)) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Já na Fila', 'Você já está nesta fila!')]
+      });
+    }
+
+    // Calcular quantos jogadores são necessários
+    const maxJogadores = parseInt(fila.tipo.replace('x', '')) * 2; // 1x1 = 2, 2x2 = 4, etc
+    
+    if (fila.jogadores.length >= maxJogadores) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Fila Cheia', 'Esta fila já está cheia!')]
+      });
+    }
+
+    // Adicionar jogador
+    fila.jogadores.push(interaction.user.id);
+    await db.updateItem('filas', f => f.id === filaId, f => ({ ...f, jogadores: fila.jogadores }));
+
+    // Atualizar mensagem
+    const message = await interaction.channel.messages.fetch(fila.messageId);
+    const embed = message.embeds[0];
+    
+    const newEmbed = new EmbedBuilder(embed.data);
+    const jogadoresList = fila.jogadores.length > 0
+      ? fila.jogadores.map(id => `<@${id}>`).join('\n')
+      : 'Nenhum jogador na fila.';
+    
+    newEmbed.spliceFields(2, 1, { name: '👥 JOGADORES', value: jogadoresList, inline: false });
+    
+    await message.edit({ embeds: [newEmbed], components: message.components });
+
+    await interaction.editReply({
+      embeds: [createSuccessEmbed('Entrou na Fila', `Você entrou na fila! (${fila.jogadores.length}/${maxJogadores})`)]
+    });
+
+    // Se completou, iniciar
+    if (fila.jogadores.length === maxJogadores) {
+      await this.iniciarFila(interaction, fila, filaId);
+    }
+  },
+
+  /**
+   * Handler para sair da fila
+   */
+  async handleSairFila(interaction) {
+    const filaId = interaction.customId.replace('sair_fila_', '');
+    
+    await interaction.deferReply({ flags: 64 });
+
+    const filas = await db.readData('filas');
+    const fila = filas.find(f => f.id === filaId);
+
+    if (!fila) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Fila Não Encontrada', 'Esta fila não existe mais.')]
+      });
+    }
+
+    if (!fila.jogadores.includes(interaction.user.id)) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Não na Fila', 'Você não está nesta fila!')]
+      });
+    }
+
+    // Remover jogador
+    fila.jogadores = fila.jogadores.filter(id => id !== interaction.user.id);
+    await db.updateItem('filas', f => f.id === filaId, f => ({ ...f, jogadores: fila.jogadores }));
+
+    // Atualizar mensagem
+    const message = await interaction.channel.messages.fetch(fila.messageId);
+    const embed = message.embeds[0];
+    
+    const newEmbed = new EmbedBuilder(embed.data);
+    const jogadoresList = fila.jogadores.length > 0
+      ? fila.jogadores.map(id => `<@${id}>`).join('\n')
+      : 'Nenhum jogador na fila.';
+    
+    newEmbed.spliceFields(2, 1, { name: '👥 JOGADORES', value: jogadoresList, inline: false });
+    
+    await message.edit({ embeds: [newEmbed], components: message.components });
+
+    await interaction.editReply({
+      embeds: [createSuccessEmbed('Saiu da Fila', 'Você saiu da fila.')]
+    });
+  },
+
+  /**
+   * Inicia fila quando completada
+   */
+  async iniciarFila(interaction, fila, filaId) {
+    // Dividir em 2 times
+    const metade = fila.jogadores.length / 2;
+    const time1 = fila.jogadores.slice(0, metade);
+    const time2 = fila.jogadores.slice(metade);
+
+    // Atualizar fila com times
+    await db.updateItem('filas', f => f.id === filaId, f => ({
+      ...f,
+      time1,
+      time2,
+      status: 'iniciada',
+      iniciadaEm: Date.now()
+    }));
+
+    // Atualizar mensagem com botões de confirmação
+    const message = await interaction.channel.messages.fetch(fila.messageId);
+    const embed = message.embeds[0];
+    
+    const newEmbed = new EmbedBuilder(embed.data);
+    newEmbed.spliceFields(2, 1, {
+      name: '👥 TIMES',
+      value: `**🔥 Gelo Infinito:**\n${time1.map(id => `<@${id}>`).join('\n')}\n\n**❄️ Gelo Normal:**\n${time2.map(id => `<@${id}>`).join('\n')}`,
+      inline: false
+    });
+
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`gelo_infinito_${filaId}`)
+          .setLabel('Gelo Infinito')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🧊'),
+        new ButtonBuilder()
+          .setCustomId(`gelo_normal_${filaId}`)
+          .setLabel('Gelo Normal')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('❄️')
+      );
+
+    await message.edit({ 
+      content: time1.concat(time2).map(id => `<@${id}>`).join(' '),
+      embeds: [newEmbed], 
+      components: [row] 
     });
   },
 

@@ -1,17 +1,16 @@
-// Comando: /fila - Criar fila de apostado
+// Comando: /fila - Criar fila de apostado no canal atual
 
-const { SlashCommandBuilder, ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { createQueueEmbed, createErrorEmbed, createSuccessEmbed } = require('../utils/embeds');
-const { QUEUE_TYPES, PLATFORMS, QUEUE_STATUS, EMOJIS } = require('../config/constants');
-const { validatePlayersForQueueType, sanitizeChannelName } = require('../utils/validators');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { createErrorEmbed, createSuccessEmbed } = require('../utils/embeds');
+const { PLATFORMS, EMOJIS, COLORS } = require('../config/constants');
 const permissions = require('../config/permissions');
 const db = require('../database');
-const logger = require('../utils/logger');
+const { temMultaPendente, getMultaPendente } = require('../services/multaService');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('fila')
-    .setDescription('Criar uma fila de apostado')
+    .setDescription('Criar uma fila de apostado no canal atual')
     .addStringOption(option =>
       option.setName('tipo')
         .setDescription('Tipo da fila')
@@ -29,221 +28,114 @@ module.exports = {
         .addChoices(
           { name: '📱 Mobile', value: PLATFORMS.MOBILE },
           { name: '🖥️ Emulador', value: PLATFORMS.EMULATOR },
-          { name: '🔀 Misto', value: PLATFORMS.MIXED }
+          { name: '🔀 Misto', value: PLATFORMS.MIXED },
+          { name: '🎯 Tático', value: PLATFORMS.TACTICAL }
         ))
     .addIntegerOption(option =>
       option.setName('valor')
         .setDescription('Valor da aposta em R$')
         .setRequired(true)
-        .setMinValue(1))
-    .addUserOption(option =>
-      option.setName('jogador1')
-        .setDescription('Jogador 1')
-        .setRequired(false))
-    .addUserOption(option =>
-      option.setName('jogador2')
-        .setDescription('Jogador 2')
-        .setRequired(false))
-    .addUserOption(option =>
-      option.setName('jogador3')
-        .setDescription('Jogador 3')
-        .setRequired(false))
-    .addUserOption(option =>
-      option.setName('jogador4')
-        .setDescription('Jogador 4')
-        .setRequired(false))
-    .addUserOption(option =>
-      option.setName('jogador5')
-        .setDescription('Jogador 5')
-        .setRequired(false))
-    .addUserOption(option =>
-      option.setName('jogador6')
-        .setDescription('Jogador 6')
-        .setRequired(false))
-    .addUserOption(option =>
-      option.setName('jogador7')
-        .setDescription('Jogador 7')
-        .setRequired(false)),
+        .setMinValue(1)),
 
   async execute(interaction) {
-    // Responder imediatamente para evitar timeout
     await interaction.deferReply({ flags: 64 });
 
-    const tipo = interaction.options.getString('tipo');
-    const plataforma = interaction.options.getString('plataforma');
-    const valor = interaction.options.getInteger('valor');
-
-    // Coletar jogadores
-    const jogadores = [interaction.user.id];
-    for (let i = 1; i <= 7; i++) {
-      const user = interaction.options.getUser(`jogador${i}`);
-      if (user && !jogadores.includes(user.id)) {
-        jogadores.push(user.id);
-      }
-    }
-
-    // Validar número de jogadores
-    const expectedPlayers = QUEUE_TYPES[tipo].players;
-    if (!validatePlayersForQueueType(tipo, jogadores.length)) {
+    // Verificar se usuário tem multa pendente
+    if (await temMultaPendente(interaction.user.id)) {
+      const multa = await getMultaPendente(interaction.user.id);
       return interaction.editReply({
         embeds: [createErrorEmbed(
-          'Número Incorreto de Jogadores',
-          `Para uma fila ${tipo} são necessários **${expectedPlayers} jogadores** (incluindo você).\nVocê adicionou: **${jogadores.length}**`
+          '💸 Multa Pendente',
+          `Você possui uma multa pendente e não pode criar filas até pagar.\n\n` +
+          `**Valor:** R$ ${multa.valor}\n` +
+          `**Motivo:** ${multa.motivo}\n` +
+          `**Canal de pagamento:** <#${multa.canalId}>`
         )]
       });
     }
 
     // Verificar blacklist
-    const blacklistedPlayers = [];
-    for (const playerId of jogadores) {
-      if (await permissions.isBlacklisted(playerId)) {
-        const entry = await permissions.getBlacklistEntry(playerId);
-        blacklistedPlayers.push({ id: playerId, entry });
-      }
-    }
-
-    if (blacklistedPlayers.length > 0) {
-      let message = `${EMOJIS.BLACKLIST} **Jogadores na blacklist não podem participar:**\n\n`;
-      for (const player of blacklistedPlayers) {
-        message += `<@${player.id}>\n**Motivo:** ${player.entry.reason}\n**Adicionado por:** <@${player.entry.addedBy}>\n\n`;
-      }
+    if (await permissions.isBlacklisted(interaction.user.id)) {
+      const entry = await permissions.getBlacklistEntry(interaction.user.id);
       return interaction.editReply({
-        embeds: [createErrorEmbed('Blacklist', message)]
+        embeds: [createErrorEmbed(
+          '🚫 Blacklist',
+          `Você está na blacklist e não pode criar filas.\n\n` +
+          `**Motivo:** ${entry.reason}\n` +
+          `**Adicionado por:** <@${entry.addedBy}>`
+        )]
       });
     }
 
-    // Criar canal privado
-    const config = await db.readData('config');
-    const channelName = sanitizeChannelName(`fila-${tipo}-${plataforma}-${Date.now()}`);
+    const tipo = interaction.options.getString('tipo');
+    const plataforma = interaction.options.getString('plataforma');
+    const valor = interaction.options.getInteger('valor');
 
     try {
-      const permissionOverwrites = [
-        {
-          id: interaction.guild.roles.everyone,
-          deny: [PermissionFlagsBits.ViewChannel]
-        },
-        ...jogadores.map(id => ({
-          id,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]
-        }))
-      ];
+      // Gerar ID único para a fila
+      const filaId = `fila_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Adicionar mediadores ativos
-      if (config.roles?.mediador) {
-        for (const roleId of config.roles.mediador) {
-          permissionOverwrites.push({
-            id: roleId,
-            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]
-          });
-        }
-      }
-
-      // Adicionar dono
-      if (process.env.OWNER_ID) {
-        permissionOverwrites.push({
-          id: process.env.OWNER_ID,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels]
-        });
-      }
-
-      const channelOptions = {
-        name: channelName,
-        type: ChannelType.GuildText,
-        permissionOverwrites
-      };
-
-      // Se configurado, adicionar categoria
-      if (config.channels?.queues) {
-        channelOptions.parent = config.channels.queues;
-      }
-
-      const channel = await interaction.guild.channels.create(channelOptions);
-
-      // Dividir jogadores em 2 times (metade cada)
-      const metade = jogadores.length / 2;
-      const time1 = jogadores.slice(0, metade);
-      const time2 = jogadores.slice(metade);
-
-      // Salvar fila no banco
+      // Criar fila no banco
       const queue = {
-        id: channel.id,
-        channelId: channel.id,
+        id: filaId,
+        channelId: interaction.channel.id,
+        messageId: null,
         tipo,
         plataforma,
         valor,
-        time1,
-        time2,
+        jogadores: [], // Começa vazia
         criadoPor: interaction.user.id,
         criadoEm: Date.now(),
-        status: 'aguardando',
-        confirmacoesTime1: [],
-        confirmacoesTime2: []
+        status: 'aguardando'
       };
 
-      await db.addItem('filas', queue);
-
       // Criar embed da fila
-      const queueEmbed = createQueueEmbed(tipo, plataforma, valor, jogadores);
-      queueEmbed.addFields(
-        { name: '🔥 Time 1 (Gelo Infinito)', value: time1.map(id => `<@${id}>`).join('\n'), inline: true },
-        { name: '❄️ Time 2 (Gelo Normal)', value: time2.map(id => `<@${id}>`).join('\n'), inline: true },
-        { name: `${EMOJIS.LOADING} Status`, value: 'Aguardando confirmação dos jogadores', inline: false },
-        { name: `${EMOJIS.MONEY} Valor por jogador`, value: `R$ ${valor}`, inline: true }
-      );
+      const queueEmbed = new EmbedBuilder()
+        .setColor(COLORS.PRIMARY)
+        .setTitle('🏆 STORM E-SPORTS')
+        .addFields(
+          { name: '🎮 MODO', value: `${tipo} ${plataforma}`, inline: false },
+          { name: '💰 VALOR', value: `R$ ${valor.toFixed(2)}`, inline: false },
+          { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
+        )
+        .setImage('https://cdn.discordapp.com/attachments/1234567890/banner.png') // Substitua pela URL real
+        .setTimestamp();
 
-      // Botões de confirmação
+      // Botões
       const row = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
-            .setCustomId(`gelo_infinito_${channel.id}`)
-            .setLabel('Confirmar - Time 1 (Gelo Infinito)')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('🔥'),
+            .setCustomId(`entrar_fila_${filaId}`)
+            .setLabel('Entrar na Fila')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅'),
           new ButtonBuilder()
-            .setCustomId(`gelo_normal_${channel.id}`)
-            .setLabel('Confirmar - Time 2 (Gelo Normal)')
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji('❄️'),
-          new ButtonBuilder()
-            .setCustomId(`cancel_queue_${channel.id}`)
-            .setLabel('Cancelar')
+            .setCustomId(`sair_fila_${filaId}`)
+            .setLabel('Sair')
             .setStyle(ButtonStyle.Danger)
-            .setEmoji(EMOJIS.ERROR)
+            .setEmoji('✖️')
         );
 
-      await channel.send({
-        content: jogadores.map(id => `<@${id}>`).join(' '),
+      const message = await interaction.channel.send({
         embeds: [queueEmbed],
         components: [row]
       });
 
-      // Enviar DM para todos os jogadores
-      for (let i = 0; i < jogadores.length; i++) {
-        const playerId = jogadores[i];
-        const time = i < metade ? 'Time 1 (Gelo Infinito)' : 'Time 2 (Gelo Normal)';
-        try {
-          const user = await interaction.client.users.fetch(playerId);
-          await user.send(`${EMOJIS.GAME} Você foi adicionado a uma fila de apostado!\n**Tipo:** ${tipo} ${plataforma}\n**Valor:** R$ ${valor}\n**Seu Time:** ${time}\n**Canal:** <#${channel.id}>\n\n${EMOJIS.WARNING} Confirme sua participação no canal!`);
-        } catch (err) {
-          console.error(`Erro ao enviar DM para ${playerId}:`, err);
-        }
-      }
+      // Atualizar messageId
+      queue.messageId = message.id;
+      await db.addItem('filas', queue);
 
-      // Log
-      await logger.logQueueCreated(interaction.client, channel.id, tipo, plataforma, interaction.user.tag, jogadores);
-
-      // Responder
       await interaction.editReply({
         embeds: [createSuccessEmbed(
           'Fila Criada',
-          `${EMOJIS.SUCCESS} Fila criada com sucesso!\n**Canal:** <#${channel.id}>\n\n${EMOJIS.INFO} Aguardando confirmação de todos os jogadores.`
+          `${EMOJIS.SUCCESS} Fila **${tipo} ${plataforma}** criada!\n**Valor:** R$ ${valor}\n\nOs jogadores podem entrar clicando no botão.`
         )]
       });
 
     } catch (error) {
       console.error('Erro ao criar fila:', error);
       await interaction.editReply({
-        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao criar a fila. Tente novamente.')]
+        embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao criar a fila.')]
       });
     }
   }

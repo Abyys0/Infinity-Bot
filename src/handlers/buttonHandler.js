@@ -11,6 +11,7 @@ const ssButtons = require('./buttons/ssButtons');
 const renewalButtons = require('./buttons/renewalButtons');
 const blacklistButtons = require('./buttons/blacklistButtons');
 const multasButtons = require('./buttons/multasButtons');
+const analistaButtons = require('./buttons/analistaButtons');
 
 /**
  * Processa cliques em botões
@@ -73,6 +74,11 @@ async function handleButton(interaction) {
       return await ssButtons.createSSPanel(interaction);
     }
 
+    // Botões novos de analista (Mobile/Emulador)
+    if (customId.startsWith('chamar_analista_')) {
+      return await analistaButtons.handle(interaction);
+    }
+
     // Botão de criar ticket do painel fixo
     if (customId === 'criar_ticket_painel') {
       return await ticketButtons.criarTicketPainel(interaction);
@@ -81,6 +87,16 @@ async function handleButton(interaction) {
     // Botão de confirmar pagamento de multa
     if (customId.startsWith('confirmar_pagamento_multa_')) {
       return await multasButtons.confirmarPagamentoMulta(interaction);
+    }
+
+    // Botões das filas (entrar/sair)
+    if (customId.startsWith('entrar_fila_') || customId.startsWith('sair_fila_')) {
+      return await queueButtons.handle(interaction);
+    }
+
+    // Botões de confirmação de fila (gelo infinito/normal)
+    if (customId.startsWith('gelo_infinito_') || customId.startsWith('gelo_normal_') || customId.startsWith('cancel_queue_') || customId.startsWith('confirmar_pagamento_')) {
+      return await queueButtons.handle(interaction);
     }
 
     // Botão não reconhecido
