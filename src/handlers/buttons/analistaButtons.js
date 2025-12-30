@@ -10,6 +10,152 @@ const logger = require('../../utils/logger');
 async function handle(interaction) {
   const customId = interaction.customId;
 
+  // analista_entrar_servico
+  if (customId === 'analista_entrar_servico') {
+    await interaction.deferReply({ flags: 64 });
+
+    // Verificar se está registrado como analista
+    const analistas = await db.readData('analistas');
+    const analista = analistas.find(a => a.userId === interaction.user.id && a.active);
+
+    if (!analista) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Não Registrado', 'Você não está registrado como analista no sistema.\n\nPeça para um dono te adicionar com `/painel`.')]
+      });
+    }
+
+    // Verificar multa
+    const { temMultaPendente, getMultaPendente } = require('../../services/multaService');
+    const temMulta = await temMultaPendente(interaction.user.id);
+    
+    if (temMulta) {
+      const multa = await getMultaPendente(interaction.user.id);
+      return interaction.editReply({
+        embeds: [createErrorEmbed(
+          '🚫 Multa Pendente',
+          `Você não pode entrar em serviço pois tem uma multa pendente!\n\n` +
+          `**💰 Valor:** R$ ${multa.valor}\n` +
+          `**📝 Motivo:** ${multa.motivo}\n` +
+          `**📍 Canal:** <#${multa.canalId}>\n\n` +
+          `Pague a multa para voltar a trabalhar.`
+        )]
+      });
+    }
+
+    if (analista.onDuty) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Já em Serviço', 'Você já está em serviço!')]
+      });
+    }
+
+    // Entrar em serviço
+    await db.updateItem('analistas',
+      a => a.userId === interaction.user.id,
+      a => ({ ...a, onDuty: true, onDutySince: Date.now() })
+    );
+
+    // Atualizar painel
+    await atualizarPainel(interaction.client);
+
+    return interaction.editReply({
+      embeds: [createSuccessEmbed(
+        'Em Serviço',
+        `${EMOJIS.ONLINE} **Você entrou em serviço como analista!**\n\nAguarde chamados de mediadores.`
+      )]
+    });
+  }
+
+  // analista_sair_servico
+  if (customId === 'analista_sair_servico') {
+    await interaction.deferReply({ flags: 64 });
+
+    const analistas = await db.readData('analistas');
+    const analista = analistas.find(a => a.userId === interaction.user.id && a.active);
+
+    if (!analista) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Não Registrado', 'Você não está registrado como analista no sistema.')]
+      });
+    }
+
+    if (!analista.onDuty) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Não em Serviço', 'Você não está em serviço!')]
+      });
+    }
+
+    // Sair de serviço
+    await db.updateItem('analistas',
+      a => a.userId === interaction.user.id,
+      a => ({ ...a, onDuty: false })
+    );
+
+    // Atualizar painel
+    await atualizarPainel(interaction.client);
+
+    return interaction.editReply({
+      embeds: [createSuccessEmbed(
+        'Fora de Serviço',
+        `${EMOJIS.OFFLINE} **Você saiu de serviço.**\n\nVocê não receberá mais chamados.`
+      )]
+    });
+  }
+
+  // analista_ver_lista
+  if (customId === 'analista_ver_lista') {
+    await interaction.deferReply({ flags: 64 });
+
+    const analistas = await db.readData('analistas');
+    const analistasAtivos = analistas.filter(a => a.active && a.onDuty);
+
+    if (analistasAtivos.length === 0) {
+      return interaction.editReply({
+        embeds: [createInfoEmbed(
+          'Nenhum Analista em Serviço',
+          'Não há analistas em serviço no momento.'
+        )]
+      });
+    }
+
+    // Agrupar por tipo
+    const mobile = analistasAtivos.filter(a => a.tipo === ANALYST_TYPES.MOBILE);
+    const emulador = analistasAtivos.filter(a => a.tipo === ANALYST_TYPES.EMULATOR);
+
+    const embed = new EmbedBuilder()
+      .setColor(COLORS.PRIMARY)
+      .setTitle(`${EMOJIS.ANALYST} Analistas em Serviço`)
+      .setDescription(`**Total:** ${analistasAtivos.length} analista(s)`)
+      .setTimestamp();
+
+    if (mobile.length > 0) {
+      const listaMobile = mobile.map(a => {
+        const tempo = Math.floor((Date.now() - (a.onDutySince || Date.now())) / 1000 / 60);
+        return `<@${a.userId}> (${tempo}m)`;
+      }).join('\n');
+      
+      embed.addFields({
+        name: '📱 Mobile',
+        value: listaMobile,
+        inline: false
+      });
+    }
+
+    if (emulador.length > 0) {
+      const listaEmulador = emulador.map(a => {
+        const tempo = Math.floor((Date.now() - (a.onDutySince || Date.now())) / 1000 / 60);
+        return `<@${a.userId}> (${tempo}m)`;
+      }).join('\n');
+      
+      embed.addFields({
+        name: '💻 Emulador',
+        value: listaEmulador,
+        inline: false
+      });
+    }
+
+    return interaction.editReply({ embeds: [embed] });
+  }
+
   // analista_configurar_pix - Qualquer um pode configurar
   if (customId === 'analista_configurar_pix') {
     // Criar modal para configurar PIX
@@ -163,6 +309,40 @@ async function handle(interaction) {
     return interaction.editReply({
       embeds: [createErrorEmbed('Erro', 'Não foi possível chamar o analista.')]
     });
+  }
+}
+
+// Função para atualizar o painel de analistas
+async function atualizarPainel(client) {
+  try {
+    const config = await db.readData('config');
+    
+    if (!config.painelAnalistaMessageId || !config.painelAnalistaChannelId) {
+      return;
+    }
+
+    const channel = await client.channels.fetch(config.painelAnalistaChannelId);
+    if (!channel) return;
+
+    const message = await channel.messages.fetch(config.painelAnalistaMessageId);
+    if (!message) return;
+
+    const analistas = await db.readData('analistas');
+    const analistasEmServico = analistas.filter(a => a.active && a.onDuty).length;
+
+    const embed = EmbedBuilder.from(message.embeds[0])
+      .setDescription(
+        `${EMOJIS.ANALYST} **Sistema de Gerenciamento de Analistas**\n\n` +
+        `**Em Serviço:** ${analistasEmServico} analista(s)\n\n` +
+        `**${EMOJIS.ONLINE} Entrar/Sair:** Controle seu status de serviço\n` +
+        `**${EMOJIS.LIST} Ver Analistas:** Lista de analistas em serviço\n` +
+        `**📱 Chamar Analista:** Solicite suporte técnico\n` +
+        `**${EMOJIS.PIX} Configurar PIX:** Configure sua chave PIX pessoal`
+      );
+
+    await message.edit({ embeds: [embed] });
+  } catch (error) {
+    logger.error('Erro ao atualizar painel de analistas:', error);
   }
 }
 

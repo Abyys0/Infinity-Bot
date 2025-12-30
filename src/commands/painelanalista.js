@@ -32,22 +32,44 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setTitle(`${EMOJIS.ANALYST} Painel de Analistas`)
       .setDescription(
-        '**Precisa de um analista para verificar uma partida?**\n\n' +
-        `${EMOJIS.INFO} Clique no botão abaixo para chamar um analista disponível.\n\n` +
-        `${EMOJIS.WARNING} **Quando usar:**\n` +
+        '**Sistema de Controle de Analistas**\n\n' +
+        `${EMOJIS.ONLINE} **Para Analistas:**\n` +
+        '• Entre em serviço para receber chamados\n' +
+        '• Saia de serviço quando terminar\n' +
+        '• Configure seu PIX para receber pagamentos\n\n' +
+        `${EMOJIS.WARNING} **Para Mediadores (Chamar Analista):**\n` +
         '• Suspeita de trapaça\n' +
         '• Verificação de resultado\n' +
         '• Análise de SS (screenshot)\n' +
         '• Disputas de partidas\n\n' +
-        `💰 **Analistas:** Configure seu PIX para receber pagamentos\n` +
-        `${EMOJIS.SHIELD} Um analista será notificado e entrará em contato.`
+        `📊 **Analistas em Serviço:** 0`
       )
       .setColor(COLORS.PRIMARY)
       .setTimestamp()
       .setFooter({ text: 'INFINITY BOT • Sistema de Analistas' });
 
-    // Botões para chamar analista (Mobile/Emulador)
+    // Botões para analistas (Entrar/Sair de Serviço)
     const row1 = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('analista_entrar_servico')
+          .setLabel('Entrar em Serviço')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('🟢'),
+        new ButtonBuilder()
+          .setCustomId('analista_sair_servico')
+          .setLabel('Sair de Serviço')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('⚪'),
+        new ButtonBuilder()
+          .setCustomId('analista_ver_lista')
+          .setLabel('Ver Analistas')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('📊')
+      );
+
+    // Botões para chamar analista (Mobile/Emulador)
+    const row2 = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
           .setCustomId('chamar_analista_mobile')
@@ -61,7 +83,7 @@ module.exports = {
           .setEmoji('💻')
       );
 
-    const row2 = new ActionRowBuilder()
+    const row3 = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
           .setCustomId('analista_configurar_pix')
@@ -71,10 +93,17 @@ module.exports = {
       );
 
     try {
-      await canal.send({
+      const message = await canal.send({
         embeds: [embed],
-        components: [row1, row2]
+        components: [row1, row2, row3]
       });
+
+      // Salvar messageId para atualizar depois
+      const db = require('../database');
+      const config = await db.readData('config');
+      config.painelAnalistaMessageId = message.id;
+      config.painelAnalistaChannelId = canal.id;
+      await db.writeData('config', config);
 
       await interaction.editReply({
         content: `✅ Painel de analista criado em ${canal}!`
