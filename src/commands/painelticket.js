@@ -1,6 +1,6 @@
 // Comando: /painelticket - Cria painel fixo de tickets (para todos)
 
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, EmbedBuilder } = require('discord.js');
 const { createErrorEmbed } = require('../utils/embeds');
 const permissions = require('../config/permissions');
 const { EMOJIS, COLORS } = require('../config/constants');
@@ -30,34 +30,27 @@ module.exports = {
 
     // Criar embed do painel
     const embed = new EmbedBuilder()
-      .setTitle(`${EMOJIS.TICKET} Sistema de Tickets - Suporte`)
+      .setTitle('SUPORTE ZE')
       .setDescription(
-        '**Precisa de ajuda ou suporte?**\n\n' +
-        `${EMOJIS.INFO} Clique no botão abaixo para abrir um ticket.\n\n` +
-        `${EMOJIS.TICKET} **O que são tickets?**\n` +
-        'Tickets são canais privados onde você pode:\n' +
-        '• Tirar dúvidas sobre o sistema\n' +
-        '• Reportar problemas\n' +
-        '• Solicitar ajuda da equipe\n' +
-        '• Fazer reclamações ou sugestões\n\n' +
-        `${EMOJIS.WARNING} **Importante:**\n` +
-        '• Apenas você e a equipe verão o ticket\n' +
-        '• Seja claro e objetivo\n' +
-        '• Aguarde o atendimento da equipe\n\n' +
-        `${EMOJIS.SUCCESS} Nossa equipe responderá o mais rápido possível!`
+        'Seja bem-vindo(a) ao quadro de tickets, aqui você pode solicitar suporte para a administração do servidor! Assim que aberto, a equipe de atendimento irá te ajudar o mais rápido possível!'
       )
       .setColor(COLORS.PRIMARY)
-      .setTimestamp()
-      .setFooter({ text: 'INFINITY BOT • Sistema de Suporte' });
+      .setImage('https://i.imgur.com/YourImageURL.png') // Substitua pela URL da sua imagem "ABRA SEU TICKET"
+      .setFooter({ text: 'Acabou de ler? Confira #🍀 • chat-geral.' });
 
-    // Botão para criar ticket
+    // Menu de seleção para escolher categoria
     const row = new ActionRowBuilder()
       .addComponents(
-        new ButtonBuilder()
-          .setCustomId('criar_ticket_painel')
-          .setLabel('Abrir Ticket de Suporte')
-          .setStyle(ButtonStyle.Success)
-          .setEmoji(EMOJIS.TICKET)
+        new StringSelectMenuBuilder()
+          .setCustomId('ticket_select_categoria')
+          .setPlaceholder('Selecione uma categoria para criar um ticket.')
+          .addOptions(
+            new StringSelectMenuOptionBuilder()
+              .setLabel('Suporte')
+              .setDescription('Abrir ticket para suporte da administração')
+              .setValue('suporte')
+              .setEmoji('🎫')
+          )
       );
 
     try {

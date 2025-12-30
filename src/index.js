@@ -7,6 +7,7 @@ const { loadCommands } = require('./handlers/commandHandler');
 const { handleButton } = require('./handlers/buttonHandler');
 const { handleModal } = require('./handlers/modalHandler');
 const { handleMessage } = require('./handlers/messageHandler');
+const { handleSelectMenu } = require('./handlers/selectMenuHandler');
 const { startMediatorRenewalChecker } = require('./services/mediadorService');
 const logger = require('./utils/logger');
 
@@ -87,6 +88,9 @@ client.on('interactionCreate', async (interaction) => {
     } else if (interaction.isButton()) {
       // Botão clicado
       await handleButton(interaction);
+    } else if (interaction.isStringSelectMenu()) {
+      // Menu de seleção
+      await handleSelectMenu(interaction);
     } else if (interaction.isModalSubmit()) {
       // Modal enviado
       await handleModal(interaction);
