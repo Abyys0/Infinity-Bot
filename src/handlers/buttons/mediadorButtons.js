@@ -9,11 +9,13 @@ const db = require('../../database');
 async function handle(interaction) {
   const customId = interaction.customId;
 
-  // Verificar se é mediador
-  const temPermissao = await permissions.isMediador(interaction.member);
-  if (!temPermissao) {
+  // Verificar se está registrado como mediador no sistema
+  const mediadores = await db.readData('mediadores');
+  const mediador = mediadores.find(m => m.userId === interaction.user.id && m.active);
+
+  if (!mediador) {
     return interaction.reply({
-      embeds: [createErrorEmbed('Sem Permissão', 'Você não tem cargo de mediador.')],
+      embeds: [createErrorEmbed('Não Registrado', 'Você não está registrado como mediador no sistema.\n\nPeça para um dono te adicionar com `/painel`.')],
       flags: 64
     });
   }
@@ -21,15 +23,6 @@ async function handle(interaction) {
   // mediador_entrar_painel
   if (customId === 'mediador_entrar_painel') {
     await interaction.deferReply({ flags: 64 });
-
-    const mediadores = await db.readData('mediadores');
-    const mediador = mediadores.find(m => m.userId === interaction.user.id && m.active);
-
-    if (!mediador) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Erro', 'Você não está registrado como mediador no sistema.')]
-      });
-    }
 
     // Verificar multa
     const { temMultaPendente, getMultaPendente } = require('../../services/multaService');
@@ -75,15 +68,6 @@ async function handle(interaction) {
   // mediador_sair_painel
   if (customId === 'mediador_sair_painel') {
     await interaction.deferReply({ flags: 64 });
-
-    const mediadores = await db.readData('mediadores');
-    const mediador = mediadores.find(m => m.userId === interaction.user.id && m.active);
-
-    if (!mediador) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Erro', 'Você não está registrado como mediador no sistema.')]
-      });
-    }
 
     if (!mediador.onDuty) {
       return interaction.editReply({
