@@ -9,9 +9,15 @@ const db = require('../../database');
 async function handle(interaction) {
   const customId = interaction.customId;
 
+  console.log('[MEDIADOR PAINEL] Botão clicado:', customId, 'por', interaction.user.tag);
+
   // Verificar se está registrado como mediador no sistema
   const mediadores = await db.readData('mediadores');
+  console.log('[MEDIADOR PAINEL] Total de mediadores no banco:', mediadores.length);
+  console.log('[MEDIADOR PAINEL] Mediadores:', mediadores.map(m => ({ userId: m.userId, active: m.active })));
+  
   const mediador = mediadores.find(m => m.userId === interaction.user.id && m.active);
+  console.log('[MEDIADOR PAINEL] Mediador encontrado para', interaction.user.id, ':', mediador ? 'SIM' : 'NÃO');
 
   if (!mediador) {
     return interaction.reply({

@@ -9,11 +9,15 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFla
  * Adiciona um mediador com prazo de 1 semana
  */
 async function addMediador(guild, userId, roleId, addedBy) {
+  console.log('[MEDIADOR] Iniciando addMediador:', { userId, roleId, addedBy });
+  
   const mediadores = await db.readData('mediadores');
+  console.log('[MEDIADOR] Mediadores existentes:', mediadores.length);
   
   // Verificar se já é mediador
   const existing = mediadores.find(m => m.userId === userId && m.active);
   if (existing) {
+    console.log('[MEDIADOR] Usuário já é mediador ativo');
     return { success: false, message: 'Usuário já é mediador ativo' };
   }
 
@@ -26,17 +30,24 @@ async function addMediador(guild, userId, roleId, addedBy) {
     addedAt: Date.now(),
     expiresAt,
     active: true,
-    renewalNotified: false
+    renewalNotified: false,
+    onDuty: false
   };
 
+  console.log('[MEDIADOR] Adicionando mediador:', mediador);
   await db.addItem('mediadores', mediador);
+  
+  // Verificar se foi salvo
+  const verificacao = await db.readData('mediadores');
+  console.log('[MEDIADOR] Mediadores após adicionar:', verificacao.length);
 
   // Adicionar cargo ao membro
   try {
     const member = await guild.members.fetch(userId);
     await member.roles.add(roleId);
+    console.log('[MEDIADOR] Cargo adicionado com sucesso');
   } catch (error) {
-    console.error('Erro ao adicionar cargo de mediador:', error);
+    console.error('[MEDIADOR] Erro ao adicionar cargo:', error);
     return { success: false, message: 'Erro ao adicionar cargo' };
   }
 

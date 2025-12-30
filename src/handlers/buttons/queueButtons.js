@@ -152,6 +152,11 @@ module.exports = {
       return await this.handleConfirmarPagamento(interaction);
     }
 
+    // atender_fila_FILAID
+    if (customId.startsWith('atender_fila_')) {
+      return await this.handleAtenderFila(interaction);
+    }
+
     // gelo_infinito_FILAID
     if (customId.startsWith('gelo_infinito_')) {
       return await this.handleGeloInfinito(interaction);
@@ -316,7 +321,9 @@ module.exports = {
       time1,
       time2,
       status: 'iniciada',
-      iniciadaEm: Date.now()
+      iniciadaEm: Date.now(),
+      mediadorId: null, // Nenhum mediador ainda
+      mediadorAtendeu: false
     }));
 
     // Atualizar mensagem com botões de confirmação
@@ -330,7 +337,14 @@ module.exports = {
       inline: false
     });
 
-    const row = new ActionRowBuilder()
+    // Adicionar campo de atendimento
+    newEmbed.addFields({
+      name: '🎯 Atendimento',
+      value: '⏳ Aguardando mediador...',
+      inline: false
+    });
+
+    const row1 = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
           .setCustomId(`gelo_infinito_${filaId}`)
@@ -344,11 +358,116 @@ module.exports = {
           .setEmoji('❄️')
       );
 
+    const row2 = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`atender_fila_${filaId}`)
+          .setLabel('Atender Fila')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('👤')
+      );
+
     await message.edit({ 
       content: time1.concat(time2).map(id => `<@${id}>`).join(' '),
       embeds: [newEmbed], 
-      components: [row] 
+      components: [row1, row2] 
     });
+  },
+
+  /**
+   * Handler para mediador atender fila
+   */
+  async handleAtenderFila(interaction) {
+    const filaId = interaction.customId.replace('atender_fila_', '');
+    
+    await interaction.deferReply({ flags: 64 });
+
+    // Verificar se é mediador
+    const mediadores = await db.readData('mediadores');
+    const mediador = mediadores.find(m => m.userId === interaction.user.id && m.active && m.onDuty);
+
+    if (!mediador) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed(
+          'Sem Permissão',
+          'Apenas mediadores em serviço podem atender filas.\n\nUse o painel de mediador para entrar em serviço.'
+        )]
+      });
+    }
+
+    const filas = await db.readData('filas');
+    const fila = filas.find(f => f.id === filaId);
+
+    if (!fila) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Fila Não Encontrada', 'Esta fila não existe mais.')]
+      });
+    }
+
+    // Verificar se já tem mediador
+    if (fila.mediadorId && fila.mediadorAtendeu) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed(
+          'Fila Já Atendida',
+          `Esta fila já está sendo atendida por <@${fila.mediadorId}>.`
+        )]
+      });
+    }
+
+    // Atribuir mediador à fila
+    await db.updateItem('filas',
+      f => f.id === filaId,
+      f => ({
+        ...f,
+        mediadorId: interaction.user.id,
+        mediadorAtendeu: true,
+        mediadorAtendeuEm: Date.now()
+      })
+    );
+
+    // Atualizar mensagem da fila
+    const message = await interaction.channel.messages.fetch(fila.messageId);
+    const embed = message.embeds[0];
+    const newEmbed = new EmbedBuilder(embed.data);
+
+    // Atualizar campo de atendimento
+    const fieldIndex = newEmbed.data.fields.findIndex(f => f.name === '🎯 Atendimento');
+    if (fieldIndex !== -1) {
+      newEmbed.spliceFields(fieldIndex, 1, {
+        name: '🎯 Atendimento',
+        value: `✅ Atendido por <@${interaction.user.id}>`,
+        inline: false
+      });
+    }
+
+    // Desabilitar botão de atender
+    const components = message.components.map(row => {
+      const newRow = new ActionRowBuilder();
+      row.components.forEach(button => {
+        const newButton = ButtonBuilder.from(button);
+        if (button.customId === `atender_fila_${filaId}`) {
+          newButton.setDisabled(true);
+        }
+        newRow.addComponents(newButton);
+      });
+      return newRow;
+    });
+
+    await message.edit({ embeds: [newEmbed], components });
+
+    await interaction.editReply({
+      embeds: [createSuccessEmbed(
+        'Fila Atendida',
+        `${EMOJIS.SUCCESS} Você está agora atendendo esta fila!\n\nAcompanhe o processo até a conclusão.`
+      )]
+    });
+
+    // Log
+    await logger.sendLog(
+      interaction.client,
+      `Mediador ${interaction.user.tag} assumiu atendimento da fila ${filaId}`,
+      interaction.user.tag
+    );
   },
 
   /**
