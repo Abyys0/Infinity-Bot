@@ -80,7 +80,7 @@ async function handle(interaction) {
 
     } catch (error) {
       console.error('Erro ao adicionar mediador:', error);
-      await interaction.editReply({
+      return interaction.editReply({
         embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao adicionar o mediador.')]
       });
     }
@@ -119,7 +119,7 @@ async function handle(interaction) {
 
     await logger.sendLog(interaction.client, `Taxas configuradas: Mediador ${mediadorValue}%, Analista ${analistaValue}%`, interaction.user.tag);
 
-    await interaction.reply({
+    return interaction.reply({
       embeds: [createSuccessEmbed(
         'Taxas Configuradas',
         `${EMOJIS.SUCCESS} **Taxas atualizadas com sucesso!**\n\n**Mediador:** ${mediadorValue}%\n**Analista:** ${analistaValue}%`
@@ -155,7 +155,7 @@ async function handle(interaction) {
 
     await logger.sendLog(interaction.client, 'Cargos do sistema configurados', interaction.user.tag);
 
-    await interaction.reply({
+    return interaction.reply({
       embeds: [createSuccessEmbed(
         'Cargos Configurados',
         `${EMOJIS.SUCCESS} **Cargos atualizados com sucesso!**\n\n**Mediador:** ${config.roles.mediador.length} cargo(s)\n**Analista:** ${config.roles.analista.length} cargo(s)\n**Staff:** ${config.roles.staff.length} cargo(s)\n**Suporte:** ${config.roles.suporte.length} cargo(s)`
@@ -194,7 +194,7 @@ async function handle(interaction) {
 
     await logger.sendLog(interaction.client, 'Canais do sistema configurados', interaction.user.tag);
 
-    await interaction.reply({
+    return interaction.reply({
       embeds: [createSuccessEmbed(
         'Canais Configurados',
         `${EMOJIS.SUCCESS} **Canais atualizados com sucesso!**\n\n**Filas:** ${queuesChannel ? `<#${queuesChannel}>` : 'Não configurado'}\n**Tickets:** ${ticketsChannel ? `<#${ticketsChannel}>` : 'Não configurado'}\n**Logs:** ${logsChannel ? `<#${logsChannel}>` : 'Não configurado'}\n**PIX:** ${pixChannel ? `<#${pixChannel}>` : 'Não configurado'}`
@@ -245,7 +245,7 @@ async function handle(interaction) {
 
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
-      await interaction.editReply({
+      return interaction.editReply({
         embeds: [createErrorEmbed('Erro', 'Não foi possível enviar a mensagem. Verifique as permissões do bot.')]
       });
     }
@@ -313,7 +313,7 @@ async function handle(interaction) {
 
     } catch (error) {
       console.error('Erro ao criar painel de tickets:', error);
-      await interaction.editReply({
+      return interaction.editReply({
         embeds: [createErrorEmbed('Erro', 'Não foi possível criar o painel. Verifique as permissões do bot.')]
       });
     }
@@ -342,7 +342,7 @@ async function handle(interaction) {
 
     await logger.sendLog(interaction.client, `Valores de filas configurados: ${values.join(', ')}`, interaction.user.tag);
 
-    await interaction.reply({
+    return interaction.reply({
       embeds: [createSuccessEmbed(
         'Valores Configurados',
         `${EMOJIS.SUCCESS} **Valores de aposta configurados com sucesso!**\n\n**Valores:** R$ ${values.join(', R$ ')}`
@@ -367,7 +367,7 @@ async function handle(interaction) {
 
     await logger.sendLog(interaction.client, `Cargos SS configurados: ${roleIds.length} cargo(s)`, interaction.user.tag);
 
-    await interaction.reply({
+    return interaction.reply({
       embeds: [createSuccessEmbed(
         'Cargos SS Configurados',
         `${EMOJIS.SUCCESS} **Cargos que podem chamar SS atualizados!**\n\n**Total:** ${roleIds.length} cargo(s)\n\n*Mediadores, Staff e Suporte já têm essa permissão por padrão.*`
@@ -392,7 +392,7 @@ async function handle(interaction) {
 
     await logger.sendLog(interaction.client, `Atendentes de ticket configurados: ${roleIds.length} cargo(s)`, interaction.user.tag);
 
-    await interaction.reply({
+    return interaction.reply({
       embeds: [createSuccessEmbed(
         'Atendentes Configurados',
         `${EMOJIS.SUCCESS} **Atendentes de ticket atualizados!**\n\n**Total:** ${roleIds.length} cargo(s)`
@@ -440,7 +440,7 @@ async function handle(interaction) {
 
     } catch (error) {
       console.error('Erro ao remover mediador:', error);
-      await interaction.editReply({
+      return interaction.editReply({
         embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao remover o mediador.')]
       });
     }
@@ -509,7 +509,7 @@ async function handle(interaction) {
 
     } catch (error) {
       console.error('Erro ao configurar PIX:', error);
-      await interaction.editReply({
+      return interaction.editReply({
         embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao salvar a configuração do PIX.')]
       });
     }
@@ -675,14 +675,14 @@ async function handle(interaction) {
 
     } catch (error) {
       console.error('Erro ao aplicar multa:', error);
-      await interaction.editReply({
+      return interaction.editReply({
         embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao aplicar a multa.')]
       });
     }
   }
 
   // Se chegou aqui, modal não reconhecido
-  await interaction.reply({
+  return interaction.reply({
     embeds: [createErrorEmbed('Modal Desconhecido', 'Este modal não é reconhecido.')],
     flags: 64
   });
