@@ -10,6 +10,8 @@ module.exports = {
     .setDescription('Ver todos os comandos disponíveis com instruções de uso'),
 
   async execute(interaction) {
+    await interaction.deferReply({ flags: 64 });
+    
     const member = interaction.member;
     
     // Verificar permissões do usuário
@@ -319,19 +321,32 @@ module.exports = {
         }
       );
 
-    // Enviar todos os embeds
-    await interaction.reply({ 
-      embeds: [
-        embedPrincipal,
-        ...(isDono ? [embedDono] : []),
-        ...(isStaff ? [embedStaff] : []),
-        ...(isMediador ? [embedMediador] : []),
-        ...(isAnalista ? [embedAnalista] : []),
-        embedPublico,
-        embedInfo,
-        embedDicas
-      ], 
-      flags: 64 
-    });
+    // Enviar todos os embeds (máximo 10 embeds por mensagem)
+    const embeds = [embedPrincipal];
+    
+    if (isDono) embeds.push(embedDono);
+    if (isStaff) embeds.push(embedStaff);
+    if (isMediador) embeds.push(embedMediador);
+    if (isAnalista) embeds.push(embedAnalista);
+    
+    embeds.push(embedPublico);
+    embeds.push(embedInfo);
+    embeds.push(embedDicas);
+    
+    // Discord permite máximo 10 embeds - se passar, divide em 2 mensagens
+    if (embeds.length <= 10) {
+      await interaction.editReply({ embeds });
+    } else {
+      // Primeira mensagem com primeiros embeds
+      await interaction.editReply({ 
+        embeds: embeds.slice(0, 10) 
+      });
+      
+      // Segunda mensagem com restante
+      await interaction.followUp({ 
+        embeds: embeds.slice(10),
+        flags: 64 
+      });
+    }
   }
 };
