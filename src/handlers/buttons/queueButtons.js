@@ -291,15 +291,39 @@ module.exports = {
       
       const channelName = `partida-${fila.tipo.toLowerCase()}-${preferenciaNome}-${fila.valor}`;
       
-      // Configurar permissões
+      // Buscar config para roles
+      const config = await db.readData('config');
+      
+      // Configurar permissões - NEGAR para @everyone primeiro
       const permissionOverwrites = [
         {
-          id: guild.id,
-          deny: [PermissionFlagsBits.ViewChannel]
+          id: guild.id, // @everyone
+          deny: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory
+          ]
         }
       ];
 
-      // Adicionar permissões para todos os jogadores
+      // Adicionar permissão para o dono (OWNER_ID)
+      if (process.env.OWNER_ID) {
+        const ownerRoleIds = process.env.OWNER_ID.split(',').map(id => id.trim());
+        ownerRoleIds.forEach(roleId => {
+          permissionOverwrites.push({
+            id: roleId,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.ReadMessageHistory,
+              PermissionFlagsBits.ManageMessages,
+              PermissionFlagsBits.ManageChannels
+            ]
+          });
+        });
+      }
+
+      // Adicionar permissões para todos os jogadores da partida
       todosJogadores.forEach(playerId => {
         permissionOverwrites.push({
           id: playerId,
@@ -311,7 +335,7 @@ module.exports = {
         });
       });
 
-    // Adicionar permissão para o mediador
+    // Adicionar permissão para o mediador selecionado
     if (mediadorSelecionado) {
       permissionOverwrites.push({
         id: mediadorSelecionado.userId,
@@ -324,10 +348,9 @@ module.exports = {
       });
     }
 
-    // Buscar roles de staff
-    const config = await db.readData('config');
-    const staffRoles = [...(config.roles?.mediador || []), ...(config.roles?.analista || []), ...(config.roles?.staff || [])];
-    staffRoles.forEach(roleId => {
+    // Adicionar roles de mediador configurados
+    const mediadorRoles = config.roles?.mediador || [];
+    mediadorRoles.forEach(roleId => {
       permissionOverwrites.push({
         id: roleId,
         allow: [
@@ -339,7 +362,7 @@ module.exports = {
       });
     });
 
-    // Criar canal privado
+    // Criar canal privado SEM herdar permissões da categoria
     let privateChannel;
     try {
       privateChannel = await guild.channels.create({
@@ -349,6 +372,11 @@ module.exports = {
         permissionOverwrites: permissionOverwrites,
         topic: `Partida ${fila.tipo} - R$ ${fila.valor} | Fila ID: ${filaId}`
       });
+      
+      // Garantir que as permissões não sejam sincronizadas com a categoria
+      if (category) {
+        await privateChannel.permissionOverwrites.set(permissionOverwrites);
+      }
 
       console.log(`[FILA] Canal privado criado: ${privateChannel.name} (${privateChannel.id})`);
     } catch (error) {
