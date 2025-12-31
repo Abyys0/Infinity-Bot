@@ -86,6 +86,11 @@ async function handleButton(interaction) {
       return await analistaButtons.handle(interaction);
     }
 
+    // Botões do painel de analista (Entrar/Sair de Serviço)
+    if (customId.startsWith('analista_')) {
+      return await analistaButtons.handle(interaction);
+    }
+
     // Botões do painel de mediador
     if (customId.startsWith('mediador_')) {
       return await mediadorButtons.handle(interaction);
