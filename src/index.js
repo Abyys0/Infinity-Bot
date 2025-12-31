@@ -128,7 +128,12 @@ client.on('messageCreate', async (message) => {
 client.on('messageDelete', async (message) => {
   try {
     const db = require('./database');
-    if (message.partial) await message.fetch();
+    
+    // Não tentar fetch se a mensagem já foi deletada (erro 10008: Unknown Message)
+    if (message.partial) {
+      console.log('[LOG] Mensagem parcial deletada - ignorando fetch');
+      return;
+    }
     
     // Marcar como deletada no log
     await db.updateItem('messageLogs',
@@ -136,7 +141,10 @@ client.on('messageDelete', async (message) => {
       m => ({ ...m, deleted: true, deletedAt: Date.now() })
     );
   } catch (error) {
-    console.error('❌ Erro ao registrar mensagem deletada:', error);
+    // Ignorar erro de mensagem inexistente
+    if (error.code !== 10008) {
+      console.error('❌ Erro ao registrar mensagem deletada:', error);
+    }
   }
 });
 

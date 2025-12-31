@@ -1244,11 +1244,15 @@ module.exports = {
         if (privateChannel) {
           await privateChannel.send({ embeds: [vitoriaEmbed] });
           
-          // Aguardar 30 segundos antes de deletar
+          // Aguardar 30 segundos antes de deletar E limpar dados
           setTimeout(async () => {
             try {
               await privateChannel.delete();
               console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
+              
+              // AGORA SIM limpar dados da partida
+              const queueButtons = require('./queueButtons');
+              await queueButtons.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
             } catch (error) {
               console.error('[FILA] Erro ao deletar canal privado:', error);
             }
@@ -1258,9 +1262,6 @@ module.exports = {
         console.error('[FILA] Erro ao acessar canal privado:', error);
       }
     }
-
-    // Resetar fila após vitória
-    await this.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 1 confirmada!`)]
@@ -1337,11 +1338,15 @@ module.exports = {
         if (privateChannel) {
           await privateChannel.send({ embeds: [vitoriaEmbed] });
           
-          // Aguardar 30 segundos antes de deletar
+          // Aguardar 30 segundos antes de deletar E limpar dados
           setTimeout(async () => {
             try {
               await privateChannel.delete();
               console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
+              
+              // AGORA SIM limpar dados da partida
+              const queueButtons = require('./queueButtons');
+              await queueButtons.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
             } catch (error) {
               console.error('[FILA] Erro ao deletar canal privado:', error);
             }
@@ -1351,9 +1356,6 @@ module.exports = {
         console.error('[FILA] Erro ao acessar canal privado:', error);
       }
     }
-
-    // Resetar fila após vitória
-    await this.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 2 confirmada!`)]
@@ -1411,11 +1413,15 @@ module.exports = {
 
           await privateChannel.send({ embeds: [cancelEmbed] });
           
-          // Aguardar 30 segundos antes de deletar
+          // Aguardar 30 segundos antes de deletar E limpar dados
           setTimeout(async () => {
             try {
               await privateChannel.delete();
               console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após cancelamento`);
+              
+              // AGORA SIM limpar dados da partida
+              const queueButtons = require('./queueButtons');
+              await queueButtons.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
             } catch (error) {
               console.error('[FILA] Erro ao deletar canal privado:', error);
             }
@@ -1425,9 +1431,6 @@ module.exports = {
         console.error('[FILA] Erro ao acessar canal privado:', error);
       }
     }
-
-    // Resetar fila após cancelamento
-    await this.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Partida Cancelada', `${EMOJIS.SUCCESS} A partida foi cancelada com sucesso.`)]
