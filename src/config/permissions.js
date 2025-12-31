@@ -30,17 +30,28 @@ async function isOwner(userId, member = null) {
     return false;
   }
   
-  const ownerRoleIds = process.env.OWNER_ID.split(',').map(id => id.trim());
-  const hasOwnerRole = member.roles.cache.some(role => ownerRoleIds.includes(role.id));
-  
-  if (hasOwnerRole) {
-    console.log(`✅ ${userId} tem cargo de dono`);
-  } else {
-    console.log(`❌ ${userId} NÃO tem cargo de dono. Cargos do usuário:`, member.roles.cache.map(r => r.id).join(', '));
-    console.log(`   Cargos de dono esperados:`, ownerRoleIds.join(', '));
+  try {
+    // Verificar se OWNER_ID está definido
+    if (!process.env.OWNER_ID) {
+      console.error('❌ OWNER_ID não está definido nas variáveis de ambiente');
+      return false;
+    }
+    
+    const ownerRoleIds = process.env.OWNER_ID.split(',').map(id => id.trim());
+    const hasOwnerRole = member.roles.cache.some(role => ownerRoleIds.includes(role.id));
+    
+    if (hasOwnerRole) {
+      console.log(`✅ ${userId} tem cargo de dono`);
+    } else {
+      console.log(`❌ ${userId} NÃO tem cargo de dono. Cargos do usuário:`, member.roles.cache.map(r => r.id).join(', '));
+      console.log(`   Cargos de dono esperados:`, ownerRoleIds.join(', '));
+    }
+    
+    return hasOwnerRole;
+  } catch (error) {
+    console.error('❌ Erro ao verificar permissão de dono:', error);
+    return false;
   }
-  
-  return hasOwnerRole;
 }
 
 /**

@@ -15,18 +15,21 @@ module.exports = {
     try {
       await interaction.deferReply({ flags: 64 });
     } catch (error) {
-      console.error('Erro ao deferir resposta:', error);
+      console.error('[PAINEL] Erro ao deferir resposta:', error);
       return;
     }
 
-    // Verificar se é o dono
-    if (!await permissions.isOwner(interaction.user.id, interaction.member)) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Sem Permissão', 'Apenas o dono pode usar este comando.')]
-      });
-    }
+    try {
+      // Verificar se é o dono
+      const isOwnerResult = await permissions.isOwner(interaction.user.id, interaction.member);
+      
+      if (!isOwnerResult) {
+        return interaction.editReply({
+          embeds: [createErrorEmbed('Sem Permissão', 'Apenas o dono pode usar este comando.')]
+        });
+      }
 
-    const embed = createOwnerPanelEmbed();
+      const embed = createOwnerPanelEmbed();
 
     // Criar botões
     const row1 = new ActionRowBuilder()
@@ -171,9 +174,23 @@ module.exports = {
           .setEmoji('💰')
       );
 
-    await interaction.editReply({
-      embeds: [embed],
-      components: [row1, row1_5, row2, row3, row4, row5, row6, row7]
-    });
+      await interaction.editReply({
+        embeds: [embed],
+        components: [row1, row1_5, row2, row3, row4, row5, row6, row7]
+      });
+    } catch (error) {
+      console.error('[PAINEL] Erro ao executar comando:', error);
+      
+      try {
+        await interaction.editReply({
+          embeds: [createErrorEmbed(
+            'Erro ao Abrir Painel',
+            `Ocorreu um erro ao abrir o painel.\n\n**Erro:** ${error.message}\n\nPor favor, verifique os logs do servidor.`
+          )]
+        });
+      } catch (replyError) {
+        console.error('[PAINEL] Erro ao enviar mensagem de erro:', replyError);
+      }
+    }
   }
 };
