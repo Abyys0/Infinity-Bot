@@ -1,6 +1,6 @@
 // Handler de botões de confirmação de fila
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { createErrorEmbed, createSuccessEmbed } = require('../../utils/embeds');
 const { EMOJIS, COLORS, QUEUE_TYPES } = require('../../config/constants');
 const db = require('../../database');
@@ -931,17 +931,21 @@ module.exports = {
     }
   },
 
-  /**   * Handler para mediador confirmar pagamento recebido
+  /**
+   * Handler para mediador confirmar pagamento recebido
    */
   async handleConfirmarPagamento(interaction) {
-    const filaId = interaction.customId.split('_')[2]; // confirmar_pagamento_FILAID
+    // O customId pode ser: confirmar_pagamento_fila_timestamp_hash
+    const parts = interaction.customId.split('_');
+    // Remover 'confirmar' e 'pagamento' e juntar o resto
+    const filaId = parts.slice(2).join('_');
     
     const filas = await db.readData('filas');
     const fila = filas.find(f => f.id === filaId);
 
     if (!fila) {
       return interaction.reply({
-        embeds: [createErrorEmbed('Fila Não Encontrada', 'Esta fila não existe mais.')],
+        embeds: [createErrorEmbed('Fila Não Encontrada', `Esta fila não existe mais.\n\nID buscado: ${filaId}`)],
         flags: 64
       });
     }
@@ -964,9 +968,20 @@ module.exports = {
       });
     }
 
+    // Usar jogadoresPartida ao invés de time1/time2
+    const jogadoresDaPartida = fila.jogadoresPartida || [];
+    
+    if (jogadoresDaPartida.length === 0) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Erro', 'Nenhum jogador encontrado nesta partida.')],
+        flags: 64
+      });
+    }
+
     // Calcular valores
     const valorPorJogador = fila.valor;
-    const totalTime = valorPorJogador * fila.time1.length;
+    const metadeJogadores = jogadoresDaPartida.length / 2;
+    const totalTime = valorPorJogador * metadeJogadores;
     const taxaMediador = Math.ceil(totalTime * 0.10);
     const valorFinal = totalTime - taxaMediador;
     const valorReceber = totalTime * 2;
@@ -982,13 +997,8 @@ module.exports = {
       })
     );
 
-    // Renomear canal com o valor que será recebido
+    // Enviar confirmação no canal atual
     try {
-      const channel = await interaction.guild.channels.fetch(filaId);
-      const novoNome = `apostado-${valorReceber.toFixed(0)}r`;
-      await channel.setName(novoNome);
-      
-      // Enviar confirmação no canal
       const confirmEmbed = new EmbedBuilder()
         .setTitle(`${EMOJIS.SUCCESS} Pagamento Confirmado`)
         .setDescription(
@@ -1003,26 +1013,21 @@ module.exports = {
         .setColor(COLORS.SUCCESS)
         .setTimestamp();
 
-      await channel.send({
-        content: `${fila.time1.map(id => `<@${id}>`).join(' ')} ${fila.time2.map(id => `<@${id}>`).join(' ')}`,
+      await interaction.channel.send({
+        content: jogadoresDaPartida.map(id => `<@${id}>`).join(' '),
         embeds: [confirmEmbed]
-      });
-
-      // Desabilitar botão
-      await interaction.message.edit({
-        components: []
       });
 
       await interaction.reply({
         embeds: [createSuccessEmbed(
           'Pagamento Confirmado',
-          `${EMOJIS.SUCCESS} Pagamento confirmado e canal renomeado para **${novoNome}**`
+          `${EMOJIS.SUCCESS} Pagamento confirmado com sucesso!`
         )],
         flags: 64
       });
 
     } catch (error) {
-      console.error('Erro ao renomear canal:', error);
+      console.error('Erro ao confirmar pagamento:', error);
       await interaction.reply({
         embeds: [createErrorEmbed('Erro', 'Ocorreu um erro ao processar a confirmação.')],
         flags: 64
@@ -1206,11 +1211,8 @@ module.exports = {
   },
 
   /**
-   * Handler para vitória do Time 1 (integração com ranking)
-   */
-  /**
    * Handler para vitória do Time 1
-   * Nota: Times são formados pelos jogadores no jogo, não automaticamente
+   * Abre modal para mediador inserir ID do vencedor
    */
   async handleVitoriaTime1(interaction) {
     const permissions = require('../../config/permissions');
@@ -1225,96 +1227,37 @@ module.exports = {
     }
 
     const filaId = interaction.customId.replace('vitoria_time1_', '');
-    await interaction.deferReply({ flags: 64 });
-
+    
+    // Verificar se a fila existe
     const fila = await db.findItem('filas', f => f.id === filaId);
     if (!fila) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Erro', 'Fila não encontrada.')]
+      return interaction.reply({
+        embeds: [createErrorEmbed('Erro', 'Fila não encontrada.')],
+        flags: 64
       });
     }
 
-    // Usar jogadoresPartida ao invés de jogadores (que foi esvaziado)
-    const jogadoresDaPartida = fila.jogadoresPartida || [];
-    
-    if (jogadoresDaPartida.length === 0) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Erro', 'Nenhum jogador encontrado nesta partida.')]
-      });
-    }
+    // Criar modal para inserir ID do vencedor
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_vitoria_${filaId}`)
+      .setTitle('🏆 Registrar Vitória');
 
-    // Calcular valores (baseado em metade dos jogadores)
-    const valorPorJogador = fila.valor;
-    const metadeJogadores = jogadoresDaPartida.length / 2;
-    const totalTime = valorPorJogador * metadeJogadores;
-    const valorReceber = totalTime * 2;
+    const vencedorInput = new TextInputBuilder()
+      .setCustomId('vencedor_id')
+      .setLabel('ID ou @menção do jogador vencedor')
+      .setPlaceholder('Ex: 123456789012345678 ou nome do jogador')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
 
-    // Atualizar status da fila
-    await db.updateItem('filas',
-      f => f.id === filaId,
-      f => ({
-        ...f,
-        status: 'finalizada',
-        vencedor: 'time1',
-        finalizadaEm: Date.now(),
-        finalizadoPor: interaction.user.id
-      })
-    );
+    const row = new ActionRowBuilder().addComponents(vencedorInput);
+    modal.addComponents(row);
 
-    // Criar embed de vitória
-    const vitoriaEmbed = new EmbedBuilder()
-      .setTitle('🏆 VITÓRIA - TIME 1')
-      .setDescription(
-        `**Fila ID:** \`${filaId}\`\n` +
-        `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
-        `**Valor:** R$ ${fila.valor}\n\n` +
-        `${EMOJIS.SUCCESS} Time 1 venceu a partida!\n` +
-        `**Valor a pagar aos vencedores:** R$ ${valorReceber.toFixed(2)} (total)\n` +
-        `**Por jogador (${metadeJogadores}):** R$ ${(valorReceber / metadeJogadores).toFixed(2)}\n\n` +
-        `⚠️ **Mediador:** Realize o pagamento aos vencedores do Time 1.`
-      )
-      .addFields({
-        name: '👥 Jogadores da Partida',
-        value: jogadoresDaPartida.map(id => `<@${id}>`).join('\n'),
-        inline: false
-      })
-      .setColor(COLORS.SUCCESS)
-      .setTimestamp();
-
-    // Deletar canal privado se existir
-    if (fila.canalPrivadoId) {
-      try {
-        const privateChannel = await interaction.guild.channels.fetch(fila.canalPrivadoId);
-        if (privateChannel) {
-          await privateChannel.send({ embeds: [vitoriaEmbed] });
-          
-          // Aguardar 30 segundos antes de deletar E limpar dados
-          setTimeout(async () => {
-            try {
-              await privateChannel.delete();
-              console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
-              
-              // AGORA SIM limpar dados da partida
-              const queueButtons = require('./queueButtons');
-              await queueButtons.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
-            } catch (error) {
-              console.error('[FILA] Erro ao deletar canal privado:', error);
-            }
-          }, 30000);
-        }
-      } catch (error) {
-        console.error('[FILA] Erro ao acessar canal privado:', error);
-      }
-    }
-
-    await interaction.editReply({
-      embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 1 confirmada!`)]
-    });
+    await interaction.showModal(modal);
   },
 
   /**
    * Handler para vitória do Time 2
-   * Nota: Times são formados pelos jogadores no jogo, não automaticamente
+   * Abre modal para mediador inserir ID do vencedor
    */
   async handleVitoriaTime2(interaction) {
     const permissions = require('../../config/permissions');
@@ -1329,91 +1272,32 @@ module.exports = {
     }
 
     const filaId = interaction.customId.replace('vitoria_time2_', '');
-    await interaction.deferReply({ flags: 64 });
-
+    
+    // Verificar se a fila existe
     const fila = await db.findItem('filas', f => f.id === filaId);
     if (!fila) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Erro', 'Fila não encontrada.')]
+      return interaction.reply({
+        embeds: [createErrorEmbed('Erro', 'Fila não encontrada.')],
+        flags: 64
       });
     }
 
-    // Usar jogadoresPartida ao invés de jogadores (que foi esvaziado)
-    const jogadoresDaPartida = fila.jogadoresPartida || [];
-    
-    if (jogadoresDaPartida.length === 0) {
-      return interaction.editReply({
-        embeds: [createErrorEmbed('Erro', 'Nenhum jogador encontrado nesta partida.')]
-      });
-    }
+    // Criar modal para inserir ID do vencedor
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_vitoria_${filaId}`)
+      .setTitle('🏆 Registrar Vitória');
 
-    // Calcular valores (baseado em metade dos jogadores)
-    const valorPorJogador = fila.valor;
-    const metadeJogadores = jogadoresDaPartida.length / 2;
-    const totalTime = valorPorJogador * metadeJogadores;
-    const valorReceber = totalTime * 2;
+    const vencedorInput = new TextInputBuilder()
+      .setCustomId('vencedor_id')
+      .setLabel('ID ou @menção do jogador vencedor')
+      .setPlaceholder('Ex: 123456789012345678 ou nome do jogador')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
 
-    // Atualizar status da fila
-    await db.updateItem('filas',
-      f => f.id === filaId,
-      f => ({
-        ...f,
-        status: 'finalizada',
-        vencedor: 'time2',
-        finalizadaEm: Date.now(),
-        finalizadoPor: interaction.user.id
-      })
-    );
+    const row = new ActionRowBuilder().addComponents(vencedorInput);
+    modal.addComponents(row);
 
-    // Criar embed de vitória
-    const vitoriaEmbed = new EmbedBuilder()
-      .setTitle('🏆 VITÓRIA - TIME 2')
-      .setDescription(
-        `**Fila ID:** \`${filaId}\`\n` +
-        `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
-        `**Valor:** R$ ${fila.valor}\n\n` +
-        `${EMOJIS.SUCCESS} Time 2 venceu a partida!\n` +
-        `**Valor a pagar aos vencedores:** R$ ${valorReceber.toFixed(2)} (total)\n` +
-        `**Por jogador (${metadeJogadores}):** R$ ${(valorReceber / metadeJogadores).toFixed(2)}\n\n` +
-        `⚠️ **Mediador:** Realize o pagamento aos vencedores do Time 2.`
-      )
-      .addFields({
-        name: '👥 Jogadores da Partida',
-        value: jogadoresDaPartida.map(id => `<@${id}>`).join('\n'),
-        inline: false
-      })
-      .setColor(COLORS.SUCCESS)
-      .setTimestamp();
-
-    // Deletar canal privado se existir
-    if (fila.canalPrivadoId) {
-      try {
-        const privateChannel = await interaction.guild.channels.fetch(fila.canalPrivadoId);
-        if (privateChannel) {
-          await privateChannel.send({ embeds: [vitoriaEmbed] });
-          
-          // Aguardar 30 segundos antes de deletar E limpar dados
-          setTimeout(async () => {
-            try {
-              await privateChannel.delete();
-              console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
-              
-              // AGORA SIM limpar dados da partida
-              const queueButtons = require('./queueButtons');
-              await queueButtons.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
-            } catch (error) {
-              console.error('[FILA] Erro ao deletar canal privado:', error);
-            }
-          }, 30000);
-        }
-      } catch (error) {
-        console.error('[FILA] Erro ao acessar canal privado:', error);
-      }
-    }
-
-    await interaction.editReply({
-      embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 2 confirmada!`)]
-    });
+    await interaction.showModal(modal);
   },
 
   /**
