@@ -116,6 +116,11 @@ async function handleButton(interaction) {
       return await queueButtons.handle(interaction);
     }
 
+    // Botões de vitória e gerenciamento de partida
+    if (customId.startsWith('vitoria_time1_') || customId.startsWith('vitoria_time2_') || customId.startsWith('cancelar_partida_') || customId.startsWith('atender_fila_')) {
+      return await queueButtons.handle(interaction);
+    }
+
     // Botão não reconhecido
     await interaction.reply({
       content: '❌ Botão não reconhecido.',

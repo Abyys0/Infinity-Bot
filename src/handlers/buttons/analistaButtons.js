@@ -258,7 +258,7 @@ async function atualizarPainel(client) {
 
     await message.edit({ embeds: [embed] });
   } catch (error) {
-    logger.error('Erro ao atualizar painel de analistas:', error);
+    console.error('Erro ao atualizar painel de analistas:', error);
   }
 }
 

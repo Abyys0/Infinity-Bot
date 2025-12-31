@@ -47,6 +47,11 @@ module.exports = {
       return await this.handleCancelarPartida(interaction);
     }
 
+    // atender_fila_FILAID - Mediador atender fila
+    if (customId.startsWith('atender_fila_')) {
+      return await this.handleAtenderFila(interaction);
+    }
+
     await interaction.reply({
       content: '❌ Botão não reconhecido.',
       flags: 64
@@ -201,7 +206,7 @@ module.exports = {
     if (fila.jogadores.length === maxJogadores) {
       // Executar em background para não bloquear a interação
       this.iniciarFila(interaction, fila, filaId).catch(error => {
-        logger.error('[FILA] Erro ao iniciar fila:', error);
+        console.error('[FILA] Erro ao iniciar fila:', error);
       });
     }
   },
