@@ -8,273 +8,6 @@ const logger = require('../../utils/logger');
 const { getActiveMediadores } = require('../../services/mediadorService');
 const rankingService = require('../../services/rankingService');
 
-/**
- * Processa a confirmação completa da fila quando todos confirmam
- * NOVO: Cria automaticamente canal privado (inspirado no Sharingan)
- */
-async function processarFilaConfirmada(interaction, fila, filaId) {
-  // Selecionar mediador ativo
-  const mediadores = await getActiveMediadores();
-  const mediadoresOnDuty = mediadores.filter(m => m.onDuty);
-  const mediadorSelecionado = mediadoresOnDuty.length > 0 
-    ? mediadoresOnDuty[Math.floor(Math.random() * mediadoresOnDuty.length)]
-    : null;
-
-  // Buscar dados do PIX - priorizar PIX do mediador que está atendendo
-  let pixInfo = null;
-  let pixTipo = 'dono'; // 'dono' ou 'mediador'
-  
-  // Se há mediador atendendo, usar o PIX dele
-  if (fila.mediadorId && fila.mediadorAtendeu) {
-    const mediadores = await db.readData('mediadores');
-    const mediadorAtendendo = mediadores.find(m => m.userId === fila.mediadorId && m.active);
-    
-    if (mediadorAtendendo && mediadorAtendendo.pix) {
-      pixInfo = mediadorAtendendo.pix;
-      pixTipo = 'mediador';
-      console.log(`[FILA] Usando PIX do mediador ${fila.mediadorId}`);
-    }
-  }
-  
-  // Se não tem PIX do mediador, usar PIX do dono
-  if (!pixInfo) {
-    const pixData = await db.readData('pix');
-    pixInfo = pixData && pixData.length > 0 ? pixData[0] : null;
-    console.log('[FILA] Usando PIX do dono');
-  }
-
-  // Calcular valores
-  const valorPorJogador = fila.valor;
-  const totalTime = valorPorJogador * fila.time1.length;
-  const valorReceber = totalTime * 2; // Total que será recebido após ganhar
-  const taxaMediador = Math.ceil(totalTime * 0.10); // 10% para mediador
-  const valorFinal = totalTime - taxaMediador;
-
-  // ====== NOVO: CRIAR CANAL PRIVADO AUTOMATICAMENTE ======
-  const guild = interaction.guild;
-  const category = interaction.channel.parent; // Usar mesma categoria do canal de fila
-  
-  // Criar nome do canal
-  const channelName = `partida-${fila.tipo.toLowerCase()}-${fila.valor}`;
-  
-  // Configurar permissões
-  const permissionOverwrites = [
-    {
-      id: guild.id,
-      deny: [PermissionFlagsBits.ViewChannel] // Negar acesso para @everyone
-    }
-  ];
-
-  // Adicionar permissões para jogadores dos dois times
-  const allPlayers = [...fila.time1, ...fila.time2];
-  allPlayers.forEach(playerId => {
-    permissionOverwrites.push({
-      id: playerId,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory
-      ]
-    });
-  });
-
-  // Adicionar permissão para o mediador
-  if (mediadorSelecionado) {
-    permissionOverwrites.push({
-      id: mediadorSelecionado.userId,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.ManageMessages
-      ]
-    });
-  }
-
-  // Buscar roles de staff para adicionar permissões
-  const config = await db.readData('config');
-  const staffRoles = [...(config.roles?.mediador || []), ...(config.roles?.analista || []), ...(config.roles?.staff || [])];
-  staffRoles.forEach(roleId => {
-    permissionOverwrites.push({
-      id: roleId,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.ManageMessages
-      ]
-    });
-  });
-
-  // Criar canal privado
-  let privateChannel;
-  try {
-    privateChannel = await guild.channels.create({
-      name: channelName,
-      type: ChannelType.GuildText,
-      parent: category?.id || null,
-      permissionOverwrites: permissionOverwrites,
-      topic: `Partida ${fila.tipo} - R$ ${fila.valor} | Fila ID: ${filaId}`
-    });
-
-    logger.info(`[FILA] Canal privado criado: ${privateChannel.name} (${privateChannel.id})`);
-  } catch (error) {
-    logger.error('[FILA] Erro ao criar canal privado:', error);
-    // Se falhar, continuar sem canal privado
-    privateChannel = null;
-  }
-
-  // Atualizar status da fila com o canal privado
-  await db.updateItem('filas',
-    f => f.id === filaId,
-    f => ({
-      ...f,
-      status: 'confirmada',
-      confirmadaEm: Date.now(),
-      mediadorId: mediadorSelecionado?.userId || null,
-      canalPrivadoId: privateChannel?.id || null
-    })
-  );
-
-  // Atualizar mensagem original no canal de filas
-  const confirmadaEmbed = new EmbedBuilder()
-    .setTitle(`${EMOJIS.SUCCESS} Fila Confirmada`)
-    .setDescription(
-      `**Fila ID:** \`${filaId}\`\n` +
-      `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
-      `**Jogadores:** ${fila.time1.length + fila.time2.length}\n\n` +
-      `${EMOJIS.SUCCESS} Todos os jogadores confirmaram!\n` +
-      (privateChannel ? `**Canal da Partida:** <#${privateChannel.id}>` : `**Status:** Aguardando pagamento...`)
-    )
-    .addFields(
-      { 
-        name: '🔥 Time 1 (Gelo Infinito)', 
-        value: fila.time1.map(id => `<@${id}>`).join('\n'), 
-        inline: true 
-      },
-      { 
-        name: '❄️ Time 2 (Gelo Normal)', 
-        value: fila.time2.map(id => `<@${id}>`).join('\n'), 
-        inline: true 
-      }
-    )
-    .setColor(COLORS.SUCCESS)
-    .setTimestamp();
-
-  // Se houver mediador, adicionar informação
-  if (mediadorSelecionado) {
-    confirmadaEmbed.addFields({
-      name: `${EMOJIS.MEDIATOR} Mediador Responsável`,
-      value: `<@${mediadorSelecionado.userId}>`,
-      inline: false
-    });
-  }
-
-  // Adicionar informações do PIX se disponível
-  if (pixInfo) {
-    const pixDescricao = pixTipo === 'mediador' 
-      ? `**Pagamento para o Mediador**\n\nEnvie o comprovante após realizar o pagamento!`
-      : `**Pagamento para a Casa**\n\nEnvie o comprovante após realizar o pagamento!`;
-    
-    const pixEmbed = new EmbedBuilder()
-      .setTitle(`${EMOJIS.MONEY} Informações de Pagamento PIX`)
-      .setDescription(pixDescricao)
-      .addFields(
-        { name: '📝 Tipo de Chave', value: pixInfo.tipoChave || 'Não configurado', inline: true },
-        { name: '🔑 Chave PIX', value: `\`${pixInfo.chave || 'Não configurado'}\``, inline: true },
-        { name: '👤 Nome', value: pixInfo.nome || 'Não configurado', inline: true },
-        { name: `${EMOJIS.MONEY} Valor a Pagar (cada time)`, value: `**R$ ${valorFinal.toFixed(2)}**`, inline: false }
-      )
-      .setColor(COLORS.PRIMARY)
-      .setTimestamp();
-
-    // Se houver imagem QR Code
-    if (pixInfo.imagemUrl) {
-      pixEmbed.setImage(pixInfo.imagemUrl);
-    }
-
-    // Botões para gerenciar a partida
-    const matchRow = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`confirmar_pagamento_${filaId}`)
-          .setLabel('Confirmar Pagamento')
-          .setStyle(ButtonStyle.Success)
-          .setEmoji(EMOJIS.MONEY),
-        new ButtonBuilder()
-          .setCustomId(`vitoria_time1_${filaId}`)
-          .setLabel('Vitória Time 1')
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji('🔥'),
-        new ButtonBuilder()
-          .setCustomId(`vitoria_time2_${filaId}`)
-          .setLabel('Vitória Time 2')
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji('❄️'),
-        new ButtonBuilder()
-          .setCustomId(`cancelar_partida_${filaId}`)
-          .setLabel('Cancelar Partida')
-          .setStyle(ButtonStyle.Danger)
-          .setEmoji('❌')
-      );
-
-    // Enviar informações no CANAL PRIVADO (se existir) ou no canal público
-    const targetChannel = privateChannel || (await interaction.guild.channels.fetch(filaId));
-    
-    // Criar embed de boas-vindas para o canal privado
-    if (privateChannel) {
-      const welcomeEmbed = new EmbedBuilder()
-        .setTitle(`🎮 Partida Iniciada - ${fila.tipo} ${fila.plataforma}`)
-        .setDescription(
-          `Bem-vindos ao canal privado da partida!\n\n` +
-          `**📋 Informações da Partida**\n` +
-          `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
-          `**Valor:** R$ ${fila.valor} por jogador\n` +
-          `**Total por time:** R$ ${totalTime.toFixed(2)}\n` +
-          `**Valor a receber (vencedor):** R$ ${valorReceber.toFixed(2)}\n\n` +
-          (mediadorSelecionado ? `**Mediador:** <@${mediadorSelecionado.userId}>\n\n` : '') +
-          `${EMOJIS.QUEUE} **Aguardando pagamento dos times...**`
-        )
-        .addFields(
-          { 
-            name: '🔥 Time 1 (Gelo Infinito)', 
-            value: fila.time1.map(id => `<@${id}>`).join('\n'), 
-            inline: true 
-          },
-          { 
-            name: '❄️ Time 2 (Gelo Normal)', 
-            value: fila.time2.map(id => `<@${id}>`).join('\n'), 
-            inline: true 
-          }
-        )
-        .setColor(COLORS.PRIMARY)
-        .setTimestamp();
-
-      await targetChannel.send({ 
-        content: allPlayers.map(id => `<@${id}>`).join(' ') + (mediadorSelecionado ? ` <@${mediadorSelecionado.userId}>` : ''),
-        embeds: [welcomeEmbed] 
-      });
-    }
-
-    await targetChannel.send({
-      content: mediadorSelecionado ? `<@${mediadorSelecionado.userId}> - Mediador responsável por esta partida` : '⚠️ Nenhum mediador ativo disponível',
-      embeds: [pixEmbed],
-      components: [matchRow]
-    });
-  }
-
-  await interaction.message.edit({
-    embeds: [confirmadaEmbed],
-    components: [] // Remove os botões de confirmação
-  });
-
-  return {
-    success: true,
-    pixInfo: pixInfo !== null,
-    privateChannel: privateChannel
-  };
-}
-
 module.exports = {
   async handle(interaction) {
     const customId = interaction.customId;
@@ -294,37 +27,22 @@ module.exports = {
       return await this.handleConfirmarPagamento(interaction);
     }
 
-    // atender_fila_FILAID
-    if (customId.startsWith('atender_fila_')) {
-      return await this.handleAtenderFila(interaction);
-    }
-
-    // gelo_infinito_FILAID
-    if (customId.startsWith('gelo_infinito_')) {
-      return await this.handleGeloInfinito(interaction);
-    }
-
-    // gelo_normal_FILAID
-    if (customId.startsWith('gelo_normal_')) {
-      return await this.handleGeloNormal(interaction);
-    }
-
     // cancel_queue_FILAID
     if (customId.startsWith('cancel_queue_')) {
       return await this.handleCancelarFila(interaction);
     }
 
-    // vitoria_time1_FILAID - Novo
+    // vitoria_time1_FILAID
     if (customId.startsWith('vitoria_time1_')) {
       return await this.handleVitoriaTime1(interaction);
     }
 
-    // vitoria_time2_FILAID - Novo
+    // vitoria_time2_FILAID
     if (customId.startsWith('vitoria_time2_')) {
       return await this.handleVitoriaTime2(interaction);
     }
 
-    // cancelar_partida_FILAID - Novo
+    // cancelar_partida_FILAID
     if (customId.startsWith('cancelar_partida_')) {
       return await this.handleCancelarPartida(interaction);
     }
@@ -534,109 +252,273 @@ module.exports = {
    * Inicia fila quando completada
    */
   async iniciarFila(interaction, fila, filaId) {
-    // Dividir em 2 times
-    const metade = fila.jogadores.length / 2;
-    const time1 = fila.jogadores.slice(0, metade);
-    const time2 = fila.jogadores.slice(metade);
+    // NÃO dividir em times - os jogadores formam times no jogo
+    const todosJogadores = fila.jogadores;
 
-    // Atualizar fila com times
+    // Selecionar mediador ativo
+    const mediadores = await getActiveMediadores();
+    const mediadoresOnDuty = mediadores.filter(m => m.onDuty);
+    const mediadorSelecionado = mediadoresOnDuty.length > 0 
+      ? mediadoresOnDuty[Math.floor(Math.random() * mediadoresOnDuty.length)]
+      : null;
+
+    // ====== CRIAR CANAL PRIVADO IMEDIATAMENTE ======
+    const guild = interaction.guild;
+    const category = interaction.channel.parent;
+    
+    // Criar nome do canal baseado na preferência da fila
+    let preferenciaNome = '';
+    const firstPlayer = fila.jogadores[0];
+    const preferencia = fila.preferencias[firstPlayer];
+    
+    if (preferencia) {
+      if (preferencia.includes('geloinfinito')) preferenciaNome = 'geloinf';
+      else if (preferencia.includes('gelonormal')) preferenciaNome = 'gelonorm';
+      else if (preferencia.includes('fullump')) preferenciaNome = 'fullump';
+      else if (preferencia.includes('misto')) preferenciaNome = 'misto';
+      else if (preferencia.includes('mobile')) preferenciaNome = 'mobile';
+      else if (preferencia.includes('emulador')) preferenciaNome = 'emu';
+    }
+    
+    const channelName = `partida-${fila.tipo.toLowerCase()}-${preferenciaNome}-${fila.valor}`;
+    
+    // Configurar permissões
+    const permissionOverwrites = [
+      {
+        id: guild.id,
+        deny: [PermissionFlagsBits.ViewChannel]
+      }
+    ];
+
+    // Adicionar permissões para todos os jogadores
+    todosJogadores.forEach(playerId => {
+      permissionOverwrites.push({
+        id: playerId,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory
+        ]
+      });
+    });
+
+    // Adicionar permissão para o mediador
+    if (mediadorSelecionado) {
+      permissionOverwrites.push({
+        id: mediadorSelecionado.userId,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.ManageMessages
+        ]
+      });
+    }
+
+    // Buscar roles de staff
+    const config = await db.readData('config');
+    const staffRoles = [...(config.roles?.mediador || []), ...(config.roles?.analista || []), ...(config.roles?.staff || [])];
+    staffRoles.forEach(roleId => {
+      permissionOverwrites.push({
+        id: roleId,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.ManageMessages
+        ]
+      });
+    });
+
+    // Criar canal privado
+    let privateChannel;
+    try {
+      privateChannel = await guild.channels.create({
+        name: channelName,
+        type: ChannelType.GuildText,
+        parent: category?.id || null,
+        permissionOverwrites: permissionOverwrites,
+        topic: `Partida ${fila.tipo} - R$ ${fila.valor} | Fila ID: ${filaId}`
+      });
+
+      logger.info(`[FILA] Canal privado criado: ${privateChannel.name} (${privateChannel.id})`);
+    } catch (error) {
+      logger.error('[FILA] Erro ao criar canal privado:', error);
+      privateChannel = null;
+    }
+
+    // Atualizar fila
     await db.updateItem('filas', f => f.id === filaId, f => ({
       ...f,
-      time1,
-      time2,
-      status: 'iniciada',
+      status: 'confirmada',
       iniciadaEm: Date.now(),
-      mediadorId: null,
-      mediadorAtendeu: false,
-      confirmacoesTime1: [],
-      confirmacoesTime2: []
+      mediadorId: mediadorSelecionado?.userId || null,
+      canalPrivadoId: privateChannel?.id || null
     }));
 
-    // Atualizar mensagem com botões de confirmação
+    // Atualizar mensagem no canal de filas
     const message = await interaction.channel.messages.fetch(fila.messageId);
-    const embed = message.embeds[0];
-    
-    const newEmbed = new EmbedBuilder(embed.data);
-    newEmbed.spliceFields(2, 1, {
-      name: '👥 TIMES',
-      value: `**🔥 Gelo Infinito:**\n${time1.map(id => `<@${id}>`).join('\n')}\n\n**❄️ Gelo Normal:**\n${time2.map(id => `<@${id}>`).join('\n')}`,
-      inline: false
-    });
-
-    // Adicionar campo de atendimento
-    newEmbed.addFields({
-      name: '🎯 Atendimento',
-      value: '⏳ Aguardando mediador...',
-      inline: false
-    });
-
-    const row1 = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`gelo_infinito_${filaId}`)
-          .setLabel('Gelo Infinito')
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji('🧊'),
-        new ButtonBuilder()
-          .setCustomId(`gelo_normal_${filaId}`)
-          .setLabel('Gelo Normal')
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji('❄️')
-      );
-
-    const row2 = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`atender_fila_${filaId}`)
-          .setLabel('Atender Fila')
-          .setStyle(ButtonStyle.Success)
-          .setEmoji('👤')
-      );
-
-    await message.edit({ 
-      content: time1.concat(time2).map(id => `<@${id}>`).join(' '),
-      embeds: [newEmbed], 
-      components: [row1, row2] 
-    });
-
-    // ENVIAR DM PARA TODOS OS JOGADORES
-    const todosJogadores = time1.concat(time2);
-    const embedDM = new EmbedBuilder()
-      .setTitle('🎮 Fila Formada!')
+    const confirmaEmbed = new EmbedBuilder()
+      .setTitle(`${EMOJIS.SUCCESS} Fila Completa!`)
       .setDescription(
-        `Sua fila **${fila.tipo} ${fila.plataforma}** está completa!\n\n` +
+        `**Fila ID:** \`${filaId}\`\n` +
+        `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
         `**Valor:** R$ ${fila.valor}\n` +
-        `**Canal:** <#${fila.channelId}>\n\n` +
-        `${EMOJIS.WARNING} **Confirme sua participação clicando nos botões no canal da fila!**\n\n` +
-        `**Seu time:** ${time1.includes(interaction.user.id) ? '🔥 Gelo Infinito' : '❄️ Gelo Normal'}`
+        `**Jogadores:** ${todosJogadores.length}\n\n` +
+        (privateChannel ? `**Canal da Partida:** <#${privateChannel.id}>` : `**Status:** Partida iniciada!`)
       )
-      .setColor(COLORS.PRIMARY)
+      .addFields({
+        name: '👥 Jogadores',
+        value: todosJogadores.map(id => `<@${id}>`).join('\n'),
+        inline: false
+      })
+      .setColor(COLORS.SUCCESS)
       .setTimestamp();
 
+    if (mediadorSelecionado) {
+      confirmaEmbed.addFields({
+        name: `${EMOJIS.MEDIATOR} Mediador Responsável`,
+        value: `<@${mediadorSelecionado.userId}>`,
+        inline: false
+      });
+    }
+
+    await message.edit({ 
+      embeds: [confirmaEmbed], 
+      components: [] 
+    });
+
+    // ====== ENVIAR MENSAGENS NO CANAL PRIVADO ======
+    if (privateChannel) {
+      // Buscar dados do PIX
+      let pixInfo = null;
+      let pixTipo = 'dono';
+      
+      if (mediadorSelecionado) {
+        const mediadores = await db.readData('mediadores');
+        const mediadorData = mediadores.find(m => m.userId === mediadorSelecionado.userId && m.active);
+        
+        if (mediadorData && mediadorData.pix) {
+          pixInfo = mediadorData.pix;
+          pixTipo = 'mediador';
+        }
+      }
+      
+      if (!pixInfo) {
+        const pixData = await db.readData('pix');
+        pixInfo = pixData && pixData.length > 0 ? pixData[0] : null;
+      }
+
+      // Calcular valores
+      const valorPorJogador = fila.valor;
+      const metadeJogadores = todosJogadores.length / 2;
+      const totalTime = valorPorJogador * metadeJogadores;
+      const valorReceber = totalTime * 2;
+      const taxaMediador = Math.ceil(totalTime * 0.10);
+      const valorFinal = totalTime - taxaMediador;
+
+      // Embed de boas-vindas
+      const welcomeEmbed = new EmbedBuilder()
+        .setTitle(`🎮 Partida Iniciada - ${fila.tipo} ${fila.plataforma}`)
+        .setDescription(
+          `Bem-vindos ao canal privado da partida!\n\n` +
+          `**📋 Informações da Partida**\n` +
+          `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
+          `**Valor:** R$ ${fila.valor} por jogador\n` +
+          `**Total por time:** R$ ${totalTime.toFixed(2)}\n` +
+          `**Valor a receber (vencedor):** R$ ${valorReceber.toFixed(2)}\n\n` +
+          (mediadorSelecionado ? `**Mediador:** <@${mediadorSelecionado.userId}>\n\n` : '') +
+          `${EMOJIS.QUEUE} **Os times serão formados pelos próprios jogadores no jogo.**`
+        )
+        .addFields({
+          name: '👥 Jogadores da Partida',
+          value: todosJogadores.map(id => `<@${id}>`).join('\n'),
+          inline: false
+        })
+        .setColor(COLORS.PRIMARY)
+        .setTimestamp();
+
+      await privateChannel.send({ 
+        content: todosJogadores.map(id => `<@${id}>`).join(' ') + (mediadorSelecionado ? ` <@${mediadorSelecionado.userId}>` : ''),
+        embeds: [welcomeEmbed] 
+      });
+
+      // Enviar PIX se disponível
+      if (pixInfo) {
+        const pixDescricao = pixTipo === 'mediador' 
+          ? `**Pagamento para o Mediador**\n\nEnvie o comprovante após realizar o pagamento!`
+          : `**Pagamento para a Casa**\n\nEnvie o comprovante após realizar o pagamento!`;
+        
+        const pixEmbed = new EmbedBuilder()
+          .setTitle(`${EMOJIS.MONEY} Informações de Pagamento PIX`)
+          .setDescription(pixDescricao)
+          .addFields(
+            { name: '📝 Tipo de Chave', value: pixInfo.tipoChave || 'Não configurado', inline: true },
+            { name: '🔑 Chave PIX', value: `\`${pixInfo.chave || 'Não configurado'}\``, inline: true },
+            { name: '👤 Nome', value: pixInfo.nome || 'Não configurado', inline: true },
+            { name: `${EMOJIS.MONEY} Valor a Pagar (cada time)`, value: `**R$ ${valorFinal.toFixed(2)}**`, inline: false }
+          )
+          .setColor(COLORS.PRIMARY)
+          .setTimestamp();
+
+        if (pixInfo.imagemUrl) {
+          pixEmbed.setImage(pixInfo.imagemUrl);
+        }
+
+        // Botões de gerenciamento
+        const matchRow = new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId(`confirmar_pagamento_${filaId}`)
+              .setLabel('Confirmar Pagamento')
+              .setStyle(ButtonStyle.Success)
+              .setEmoji(EMOJIS.MONEY),
+            new ButtonBuilder()
+              .setCustomId(`vitoria_time1_${filaId}`)
+              .setLabel('Vitória Time 1')
+              .setStyle(ButtonStyle.Primary)
+              .setEmoji('🏆'),
+            new ButtonBuilder()
+              .setCustomId(`vitoria_time2_${filaId}`)
+              .setLabel('Vitória Time 2')
+              .setStyle(ButtonStyle.Primary)
+              .setEmoji('🏆'),
+            new ButtonBuilder()
+              .setCustomId(`cancelar_partida_${filaId}`)
+              .setLabel('Cancelar Partida')
+              .setStyle(ButtonStyle.Danger)
+              .setEmoji('❌')
+          );
+
+        await privateChannel.send({
+          content: mediadorSelecionado ? `<@${mediadorSelecionado.userId}> - Mediador responsável por esta partida` : '⚠️ Nenhum mediador ativo disponível',
+          embeds: [pixEmbed],
+          components: [matchRow]
+        });
+      }
+    }
+
+    // ENVIAR DM PARA TODOS OS JOGADORES
     for (const userId of todosJogadores) {
       try {
         const user = await interaction.client.users.fetch(userId);
-        const time = time1.includes(userId) ? 'Gelo Infinito 🔥' : 'Gelo Normal ❄️';
         
         const dmEmbed = new EmbedBuilder()
-          .setTitle('🎮 Fila Formada!')
+          .setTitle('🎮 Fila Completa!')
           .setDescription(
             `Sua fila **${fila.tipo} ${fila.plataforma}** está completa!\n\n` +
             `**Valor:** R$ ${fila.valor}\n` +
-            `**Seu time:** ${time}\n` +
-            `**Canal:** <#${fila.channelId}>\n\n` +
-            `${EMOJIS.WARNING} **IMPORTANTE:**\n` +
-            `Vá até o canal da fila e clique no botão do seu time para confirmar!\n\n` +
-            `⏰ Aguardando confirmação de todos os jogadores...`
+            (privateChannel ? `**Canal da Partida:** <#${privateChannel.id}>\n\n` : '\n') +
+            `${EMOJIS.SUCCESS} **Acesse o canal privado da partida agora!**\n\n` +
+            `⏰ Os times serão formados dentro do jogo.`
           )
-          .setColor(time1.includes(userId) ? COLORS.SUCCESS : COLORS.SECONDARY)
+          .setColor(COLORS.SUCCESS)
           .setTimestamp();
 
         await user.send({ embeds: [dmEmbed] });
         logger.log(`DM enviada para ${user.tag} sobre fila ${filaId}`);
       } catch (error) {
         logger.error(`Erro ao enviar DM para ${userId}:`, error);
-        // Continuar mesmo se falhar enviar DM
       }
     }
 
@@ -1074,7 +956,7 @@ module.exports = {
     });
 
     // Notificar todos os jogadores
-    const todosJogadores = [...fila.time1, ...fila.time2];
+    const todosJogadores = fila.jogadores || [];
     for (const userId of todosJogadores) {
       try {
         const user = await interaction.client.users.fetch(userId);
@@ -1184,6 +1066,10 @@ module.exports = {
   /**
    * Handler para vitória do Time 1 (integração com ranking)
    */
+  /**
+   * Handler para vitória do Time 1
+   * Nota: Times são formados pelos jogadores no jogo, não automaticamente
+   */
   async handleVitoriaTime1(interaction) {
     const permissions = require('../../config/permissions');
     
@@ -1205,20 +1091,11 @@ module.exports = {
       });
     }
 
-    // Calcular valores
+    // Calcular valores (baseado em metade dos jogadores)
     const valorPorJogador = fila.valor;
-    const totalTime = valorPorJogador * fila.time1.length;
+    const metadeJogadores = fila.jogadores.length / 2;
+    const totalTime = valorPorJogador * metadeJogadores;
     const valorReceber = totalTime * 2;
-
-    // Atualizar ranking para os vencedores (Time 1)
-    for (const playerId of fila.time1) {
-      await rankingService.addVictory(playerId, valorReceber / fila.time1.length);
-    }
-
-    // Atualizar ranking para os perdedores (Time 2)
-    for (const playerId of fila.time2) {
-      await rankingService.addDefeat(playerId, totalTime / fila.time2.length);
-    }
 
     // Atualizar status da fila
     await db.updateItem('filas',
@@ -1234,27 +1111,21 @@ module.exports = {
 
     // Criar embed de vitória
     const vitoriaEmbed = new EmbedBuilder()
-      .setTitle('🏆 VITÓRIA - TIME 1 (GELO INFINITO)')
+      .setTitle('🏆 VITÓRIA - TIME 1')
       .setDescription(
         `**Fila ID:** \`${filaId}\`\n` +
         `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
         `**Valor:** R$ ${fila.valor}\n\n` +
         `${EMOJIS.SUCCESS} Time 1 venceu a partida!\n` +
-        `**Valor recebido por jogador:** R$ ${(valorReceber / fila.time1.length).toFixed(2)}\n\n` +
-        `🏆 **Ranking atualizado automaticamente!**`
+        `**Valor a pagar aos vencedores:** R$ ${valorReceber.toFixed(2)} (total)\n` +
+        `**Por jogador (${metadeJogadores}):** R$ ${(valorReceber / metadeJogadores).toFixed(2)}\n\n` +
+        `⚠️ **Mediador:** Realize o pagamento aos vencedores do Time 1.`
       )
-      .addFields(
-        { 
-          name: '🔥 Vencedores (Time 1)', 
-          value: fila.time1.map(id => `<@${id}>`).join('\n'), 
-          inline: true 
-        },
-        { 
-          name: '❄️ Perdedores (Time 2)', 
-          value: fila.time2.map(id => `<@${id}>`).join('\n'), 
-          inline: true 
-        }
-      )
+      .addFields({
+        name: '👥 Jogadores da Partida',
+        value: fila.jogadores.map(id => `<@${id}>`).join('\n'),
+        inline: false
+      })
       .setColor(COLORS.SUCCESS)
       .setTimestamp();
 
@@ -1281,12 +1152,13 @@ module.exports = {
     }
 
     await interaction.editReply({
-      embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 1 confirmada! Ranking atualizado.`)]
+      embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 1 confirmada!`)]
     });
   },
 
   /**
-   * Handler para vitória do Time 2 (integração com ranking)
+   * Handler para vitória do Time 2
+   * Nota: Times são formados pelos jogadores no jogo, não automaticamente
    */
   async handleVitoriaTime2(interaction) {
     const permissions = require('../../config/permissions');
@@ -1309,20 +1181,11 @@ module.exports = {
       });
     }
 
-    // Calcular valores
+    // Calcular valores (baseado em metade dos jogadores)
     const valorPorJogador = fila.valor;
-    const totalTime = valorPorJogador * fila.time2.length;
+    const metadeJogadores = fila.jogadores.length / 2;
+    const totalTime = valorPorJogador * metadeJogadores;
     const valorReceber = totalTime * 2;
-
-    // Atualizar ranking para os vencedores (Time 2)
-    for (const playerId of fila.time2) {
-      await rankingService.addVictory(playerId, valorReceber / fila.time2.length);
-    }
-
-    // Atualizar ranking para os perdedores (Time 1)
-    for (const playerId of fila.time1) {
-      await rankingService.addDefeat(playerId, totalTime / fila.time1.length);
-    }
 
     // Atualizar status da fila
     await db.updateItem('filas',
@@ -1338,27 +1201,21 @@ module.exports = {
 
     // Criar embed de vitória
     const vitoriaEmbed = new EmbedBuilder()
-      .setTitle('🏆 VITÓRIA - TIME 2 (GELO NORMAL)')
+      .setTitle('🏆 VITÓRIA - TIME 2')
       .setDescription(
         `**Fila ID:** \`${filaId}\`\n` +
         `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
         `**Valor:** R$ ${fila.valor}\n\n` +
         `${EMOJIS.SUCCESS} Time 2 venceu a partida!\n` +
-        `**Valor recebido por jogador:** R$ ${(valorReceber / fila.time2.length).toFixed(2)}\n\n` +
-        `🏆 **Ranking atualizado automaticamente!**`
+        `**Valor a pagar aos vencedores:** R$ ${valorReceber.toFixed(2)} (total)\n` +
+        `**Por jogador (${metadeJogadores}):** R$ ${(valorReceber / metadeJogadores).toFixed(2)}\n\n` +
+        `⚠️ **Mediador:** Realize o pagamento aos vencedores do Time 2.`
       )
-      .addFields(
-        { 
-          name: '❄️ Vencedores (Time 2)', 
-          value: fila.time2.map(id => `<@${id}>`).join('\n'), 
-          inline: true 
-        },
-        { 
-          name: '🔥 Perdedores (Time 1)', 
-          value: fila.time1.map(id => `<@${id}>`).join('\n'), 
-          inline: true 
-        }
-      )
+      .addFields({
+        name: '👥 Jogadores da Partida',
+        value: fila.jogadores.map(id => `<@${id}>`).join('\n'),
+        inline: false
+      })
       .setColor(COLORS.SUCCESS)
       .setTimestamp();
 
@@ -1385,7 +1242,7 @@ module.exports = {
     }
 
     await interaction.editReply({
-      embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 2 confirmada! Ranking atualizado.`)]
+      embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 2 confirmada!`)]
     });
   },
 
