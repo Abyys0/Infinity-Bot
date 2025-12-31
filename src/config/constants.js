@@ -55,12 +55,12 @@ const LIMITS = {
   MAX_EMBED_DESCRIPTION: 4096
 };
 
-// Tipos de fila
+// Tipos de fila - TODAS iniciam com 2 jogadores
 const QUEUE_TYPES = {
   '1x1': { players: 2, label: '1v1' },
-  '2x2': { players: 4, label: '2v2' },
-  '3x3': { players: 6, label: '3v3' },
-  '4x4': { players: 8, label: '4v4' }
+  '2x2': { players: 2, label: '2v2' },
+  '3x3': { players: 2, label: '3v3' },
+  '4x4': { players: 2, label: '4v4' }
 };
 
 // Plataformas
