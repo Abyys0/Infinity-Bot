@@ -366,41 +366,48 @@ module.exports = {
     console.log(`[FILA] Fila ${filaId} resetada - jogadores movidos para partida, painel pronto para novos jogadores`);
 
     // Atualizar mensagem no canal de filas - MANTER BOTÕES ATIVOS
-    const message = await interaction.channel.messages.fetch(fila.messageId);
-    const maxJogadores = QUEUE_TYPES[fila.tipo]?.players || 2;
-    
-    const filaResetadaEmbed = new EmbedBuilder()
-      .setColor(COLORS.PRIMARY)
-      .setTitle(`${EMOJIS.GAME} ${fila.tipo} ${fila.plataforma}`)
-      .setDescription(
-        `**Valor:** R$ ${fila.valor}\n` +
-        `**Jogadores necessários:** ${maxJogadores}\n\n` +
-        `✅ **Última partida:** <#${privateChannel?.id || 'Canal criado'}>`
-      )
-      .addFields(
-        { name: '⚔️ MODO', value: `${fila.tipo}`, inline: true },
-        { name: '💵 VALOR', value: `R$ ${fila.valor}`, inline: true },
-        { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
-      )
-      .setTimestamp();
+    try {
+      const filaChannel = await interaction.client.channels.fetch(fila.channelId);
+      const message = await filaChannel.messages.fetch(fila.messageId);
+      const maxJogadores = QUEUE_TYPES[fila.tipo]?.players || 2;
+      
+      const filaResetadaEmbed = new EmbedBuilder()
+        .setColor(COLORS.PRIMARY)
+        .setTitle(`${EMOJIS.GAME} ${fila.tipo} ${fila.plataforma}`)
+        .setDescription(
+          `**Valor:** R$ ${fila.valor}\n` +
+          `**Jogadores necessários:** ${maxJogadores}\n\n` +
+          `✅ **Última partida:** <#${privateChannel?.id || 'Canal criado'}>`
+        )
+        .addFields(
+          { name: '⚔️ MODO', value: `${fila.tipo}`, inline: true },
+          { name: '💵 VALOR', value: `R$ ${fila.valor}`, inline: true },
+          { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
+        )
+        .setTimestamp();
 
-    // Recriar botões IMEDIATAMENTE
-    const row = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`entrar_fila_${filaId}`)
-          .setLabel('✅ Entrar na Fila')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId(`sair_fila_${filaId}`)
-          .setLabel('❌ Sair da Fila')
-          .setStyle(ButtonStyle.Danger)
-      );
+      // Recriar botões IMEDIATAMENTE
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`entrar_fila_${filaId}`)
+            .setLabel('✅ Entrar na Fila')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`sair_fila_${filaId}`)
+            .setLabel('❌ Sair da Fila')
+            .setStyle(ButtonStyle.Danger)
+        );
 
-    await message.edit({ 
-      embeds: [filaResetadaEmbed], 
-      components: [row]
-    });
+      await message.edit({ 
+        embeds: [filaResetadaEmbed], 
+        components: [row]
+      });
+
+      console.log(`[FILA] Painel da fila ${filaId} atualizado com sucesso`);
+    } catch (error) {
+      console.error(`[FILA] Erro ao atualizar painel da fila ${filaId}:`, error);
+    }
 
     // ====== ENVIAR MENSAGENS NO CANAL PRIVADO ======
     if (privateChannel) {
