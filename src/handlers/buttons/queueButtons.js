@@ -351,10 +351,11 @@ module.exports = {
       privateChannel = null;
     }
 
-    // Atualizar fila
+    // Atualizar fila para status "em_andamento" (não resetar ainda)
     await db.updateItem('filas', f => f.id === filaId, f => ({
       ...f,
-      status: 'confirmada',
+      status: 'em_andamento',
+      jogadoresPartida: [...todosJogadores], // Salvar jogadores da partida
       iniciadaEm: Date.now(),
       mediadorId: mediadorSelecionado?.userId || null,
       canalPrivadoId: privateChannel?.id || null
@@ -387,53 +388,11 @@ module.exports = {
       });
     }
 
-    // Mostrar temporariamente que a fila completou
+    // Mostrar que a fila completou (não resetar ainda - esperar partida terminar)
     await message.edit({ 
       embeds: [confirmaEmbed], 
       components: [] 
     });
-
-    // Após 5 segundos, resetar o painel para ficar disponível novamente
-    setTimeout(async () => {
-      try {
-        const filaAtualizada = await db.readData('filas').then(filas => filas.find(f => f.id === filaId));
-        if (!filaAtualizada) return;
-
-        const maxJogadores = QUEUE_TYPES[filaAtualizada.tipo]?.players || 2;
-        const resetEmbed = new EmbedBuilder()
-          .setColor(COLORS.PRIMARY)
-          .setTitle(`${EMOJIS.GAME} ${filaAtualizada.tipo} ${filaAtualizada.plataforma}`)
-          .setDescription(`**Valor:** R$ ${filaAtualizada.valor}\n**Jogadores necessários:** ${maxJogadores}`)
-          .addFields(
-            { name: '⚔️ MODO', value: `${filaAtualizada.tipo}`, inline: true },
-            { name: '💵 VALOR', value: `R$ ${filaAtualizada.valor}`, inline: true },
-            { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
-          )
-          .setTimestamp();
-
-        // Recriar botões
-        const row = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId(`entrar_fila_${filaId}`)
-              .setLabel('✅ Entrar na Fila')
-              .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-              .setCustomId(`sair_fila_${filaId}`)
-              .setLabel('❌ Sair da Fila')
-              .setStyle(ButtonStyle.Danger)
-          );
-
-        await message.edit({
-          embeds: [resetEmbed],
-          components: [row]
-        });
-
-        console.log(`[FILA] Painel ${filaId} resetado e reativado para novas partidas`);
-      } catch (error) {
-        console.error(`[FILA] Erro ao resetar painel da fila ${filaId}:`, error);
-      }
-    }, 5000);
 
     // ====== ENVIAR MENSAGENS NO CANAL PRIVADO ======
     if (privateChannel) {
@@ -565,18 +524,7 @@ module.exports = {
       }
     }
 
-    // RESETAR FILA (esvaziar jogadores mas manter o painel ativo)
-    try {
-      await db.updateItem('filas', f => f.id === filaId, f => ({
-        ...f,
-        jogadores: [],
-        preferencias: {},
-        status: 'aberta'
-      }));
-      console.log(`[FILA] Fila ${filaId} resetada - jogadores removidos, painel mantido ativo`);
-    } catch (error) {
-      console.error(`[FILA] Erro ao resetar fila ${filaId}:`, error);
-    }
+    // NÃO RESETAR A FILA AQUI - só resetar quando a partida terminar
 
     // ENVIAR DM PARA TODOS OS JOGADORES
     for (const userId of todosJogadores) {
@@ -639,6 +587,77 @@ module.exports = {
       } catch (notifyError) {
         console.error('[FILA] Erro ao notificar sobre erro da fila:', notifyError);
       }
+    }
+  },
+
+  /**
+   * Reseta a fila após a partida terminar
+   */
+  async resetarFilaAposPartida(filaId, messageId, channelId, client) {
+    try {
+      const filas = await db.readData('filas');
+      const fila = filas.find(f => f.id === filaId);
+      
+      if (!fila) {
+        console.log(`[FILA] Fila ${filaId} não encontrada para resetar`);
+        return;
+      }
+
+      // Resetar fila no banco
+      await db.updateItem('filas', f => f.id === filaId, f => ({
+        ...f,
+        jogadores: [],
+        jogadoresPartida: [],
+        preferencias: {},
+        status: 'aberta',
+        mediadorId: null,
+        canalPrivadoId: null,
+        iniciadaEm: null
+      }));
+
+      console.log(`[FILA] Fila ${filaId} resetada após término da partida`);
+
+      // Atualizar painel da fila
+      try {
+        const channel = await client.channels.fetch(channelId);
+        const message = await channel.messages.fetch(messageId);
+        
+        const maxJogadores = QUEUE_TYPES[fila.tipo]?.players || 2;
+        const resetEmbed = new EmbedBuilder()
+          .setColor(COLORS.PRIMARY)
+          .setTitle(`${EMOJIS.GAME} ${fila.tipo} ${fila.plataforma}`)
+          .setDescription(`**Valor:** R$ ${fila.valor}\n**Jogadores necessários:** ${maxJogadores}`)
+          .addFields(
+            { name: '⚔️ MODO', value: `${fila.tipo}`, inline: true },
+            { name: '💵 VALOR', value: `R$ ${fila.valor}`, inline: true },
+            { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
+          )
+          .setTimestamp();
+
+        // Recriar botões
+        const row = new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId(`entrar_fila_${filaId}`)
+              .setLabel('✅ Entrar na Fila')
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+              .setCustomId(`sair_fila_${filaId}`)
+              .setLabel('❌ Sair da Fila')
+              .setStyle(ButtonStyle.Danger)
+          );
+
+        await message.edit({
+          embeds: [resetEmbed],
+          components: [row]
+        });
+
+        console.log(`[FILA] Painel ${filaId} resetado e reativado para novas partidas`);
+      } catch (error) {
+        console.error(`[FILA] Erro ao atualizar painel da fila ${filaId}:`, error);
+      }
+    } catch (error) {
+      console.error(`[FILA] Erro ao resetar fila ${filaId}:`, error);
     }
   },
 
@@ -1257,16 +1276,19 @@ module.exports = {
           setTimeout(async () => {
             try {
               await privateChannel.delete();
-              logger.info(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
+              console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
             } catch (error) {
-              logger.error('[FILA] Erro ao deletar canal privado:', error);
+              console.error('[FILA] Erro ao deletar canal privado:', error);
             }
           }, 30000);
         }
       } catch (error) {
-        logger.error('[FILA] Erro ao acessar canal privado:', error);
+        console.error('[FILA] Erro ao acessar canal privado:', error);
       }
     }
+
+    // Resetar fila após vitória
+    await this.resetarFilaAposPartida(filaId, fila.messageId, interaction.channel.id, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 1 confirmada!`)]
@@ -1347,16 +1369,19 @@ module.exports = {
           setTimeout(async () => {
             try {
               await privateChannel.delete();
-              logger.info(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
+              console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
             } catch (error) {
-              logger.error('[FILA] Erro ao deletar canal privado:', error);
+              console.error('[FILA] Erro ao deletar canal privado:', error);
             }
           }, 30000);
         }
       } catch (error) {
-        logger.error('[FILA] Erro ao acessar canal privado:', error);
+        console.error('[FILA] Erro ao acessar canal privado:', error);
       }
     }
+
+    // Resetar fila após vitória
+    await this.resetarFilaAposPartida(filaId, fila.messageId, interaction.channel.id, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 2 confirmada!`)]
@@ -1418,16 +1443,19 @@ module.exports = {
           setTimeout(async () => {
             try {
               await privateChannel.delete();
-              logger.info(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após cancelamento`);
+              console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após cancelamento`);
             } catch (error) {
-              logger.error('[FILA] Erro ao deletar canal privado:', error);
+              console.error('[FILA] Erro ao deletar canal privado:', error);
             }
           }, 30000);
         }
       } catch (error) {
-        logger.error('[FILA] Erro ao acessar canal privado:', error);
+        console.error('[FILA] Erro ao acessar canal privado:', error);
       }
     }
+
+    // Resetar fila após cancelamento
+    await this.resetarFilaAposPartida(filaId, fila.messageId, interaction.channel.id, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Partida Cancelada', `${EMOJIS.SUCCESS} A partida foi cancelada com sucesso.`)]
