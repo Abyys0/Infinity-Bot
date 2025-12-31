@@ -27,19 +27,19 @@ class RankingService {
 
     // Agendar atualização automática a cada hora
     this.updateJob = cron.schedule('0 * * * *', async () => {
-      logger.info('[RANKING] Executando atualização automática do ranking');
+      console.log('[RANKING] Executando atualização automática do ranking');
       await this.updateRankingChannel();
     });
 
     // Agendar reset mensal (todo dia 1 às 00:00)
     this.resetJob = cron.schedule('0 0 1 * *', async () => {
-      logger.info('[RANKING] Executando reset mensal do ranking');
+      console.log('[RANKING] Executando reset mensal do ranking');
       await this.resetRanking();
     });
 
-    logger.info('[RANKING] Serviço de ranking inicializado com sucesso');
-    logger.info('[RANKING] - Atualização automática: A cada hora');
-    logger.info('[RANKING] - Reset automático: Todo dia 1 do mês às 00:00');
+    console.log('[RANKING] Serviço de ranking inicializado com sucesso');
+    console.log('[RANKING] - Atualização automática: A cada hora');
+    console.log('[RANKING] - Reset automático: Todo dia 1 do mês às 00:00');
   }
 
   /**
@@ -60,7 +60,7 @@ class RankingService {
       })
     );
 
-    logger.info(`[RANKING] Canal de ranking definido: ${channelId}`);
+    console.log(`[RANKING] Canal de ranking definido: ${channelId}`);
     
     // Criar/atualizar mensagem de ranking imediatamente
     await this.updateRankingChannel();
@@ -90,7 +90,7 @@ class RankingService {
     }
 
     await db.writeData('ranking', ranking);
-    logger.info(`[RANKING] Vitória adicionada para ${userId} (+R$${valorGanho.toFixed(2)})`);
+    console.log(`[RANKING] Vitória adicionada para ${userId} (+R$${valorGanho.toFixed(2)})`);
 
     // Atualizar canal se configurado
     if (this.rankingChannelId) {
@@ -124,7 +124,7 @@ class RankingService {
     }
 
     await db.writeData('ranking', ranking);
-    logger.info(`[RANKING] Derrota adicionada para ${userId} (-R$${valorPerdido.toFixed(2)})`);
+    console.log(`[RANKING] Derrota adicionada para ${userId} (-R$${valorPerdido.toFixed(2)})`);
 
     // Atualizar canal se configurado
     if (this.rankingChannelId) {
@@ -170,7 +170,7 @@ class RankingService {
     try {
       const channel = await this.client.channels.fetch(this.rankingChannelId);
       if (!channel || !channel.isTextBased()) {
-        logger.error('[RANKING] Canal de ranking inválido');
+        console.error('[RANKING] Canal de ranking inválido');
         return;
       }
 
@@ -182,21 +182,21 @@ class RankingService {
         try {
           const message = await channel.messages.fetch(this.rankingMessageId);
           await message.edit({ embeds: [embed] });
-          logger.info('[RANKING] Mensagem de ranking atualizada');
+          console.log('[RANKING] Mensagem de ranking atualizada');
         } catch (error) {
           // Mensagem não existe mais, criar nova
           const newMessage = await channel.send({ embeds: [embed] });
           this.rankingMessageId = newMessage.id;
-          logger.info('[RANKING] Nova mensagem de ranking criada');
+          console.log('[RANKING] Nova mensagem de ranking criada');
         }
       } else {
         // Criar nova mensagem
         const newMessage = await channel.send({ embeds: [embed] });
         this.rankingMessageId = newMessage.id;
-        logger.info('[RANKING] Nova mensagem de ranking criada');
+        console.log('[RANKING] Nova mensagem de ranking criada');
       }
     } catch (error) {
-      logger.error('[RANKING] Erro ao atualizar canal de ranking:', error);
+      console.error('[RANKING] Erro ao atualizar canal de ranking:', error);
     }
   }
 
@@ -250,11 +250,11 @@ class RankingService {
       };
 
       // Salvar backup (você pode criar um sistema de histórico se quiser)
-      logger.info(`[RANKING] Backup do ranking salvo: ${currentRanking.length} jogadores`);
+      console.log(`[RANKING] Backup do ranking salvo: ${currentRanking.length} jogadores`);
 
       // Resetar ranking
       await db.writeData('ranking', []);
-      logger.info('[RANKING] Ranking resetado com sucesso');
+      console.log('[RANKING] Ranking resetado com sucesso');
 
       // Atualizar canal
       if (this.rankingChannelId) {
@@ -279,7 +279,7 @@ class RankingService {
         }
       }
     } catch (error) {
-      logger.error('[RANKING] Erro ao resetar ranking:', error);
+      console.error('[RANKING] Erro ao resetar ranking:', error);
     }
   }
 
@@ -293,7 +293,7 @@ class RankingService {
     if (this.resetJob) {
       this.resetJob.stop();
     }
-    logger.info('[RANKING] Serviço de ranking parado');
+    console.log('[RANKING] Serviço de ranking parado');
   }
 }
 
