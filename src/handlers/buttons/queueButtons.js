@@ -447,6 +447,31 @@ module.exports = {
         embeds: [welcomeEmbed] 
       });
 
+      // Criar botões de gerenciamento da partida
+      const matchRow = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`confirmar_pagamento_${filaId}`)
+            .setLabel('Confirmar Pagamento')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji(EMOJIS.MONEY),
+          new ButtonBuilder()
+            .setCustomId(`vitoria_time1_${filaId}`)
+            .setLabel('Vitória Time 1')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🏆'),
+          new ButtonBuilder()
+            .setCustomId(`vitoria_time2_${filaId}`)
+            .setLabel('Vitória Time 2')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🏆'),
+          new ButtonBuilder()
+            .setCustomId(`cancelar_partida_${filaId}`)
+            .setLabel('Cancelar Partida')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('❌')
+        );
+
       // Enviar PIX se disponível
       if (pixInfo) {
         const pixDescricao = pixTipo === 'mediador' 
@@ -469,37 +494,40 @@ module.exports = {
           pixEmbed.setImage(pixInfo.imagemUrl);
         }
 
-        // Botões de gerenciamento
-        const matchRow = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId(`confirmar_pagamento_${filaId}`)
-              .setLabel('Confirmar Pagamento')
-              .setStyle(ButtonStyle.Success)
-              .setEmoji(EMOJIS.MONEY),
-            new ButtonBuilder()
-              .setCustomId(`vitoria_time1_${filaId}`)
-              .setLabel('Vitória Time 1')
-              .setStyle(ButtonStyle.Primary)
-              .setEmoji('🏆'),
-            new ButtonBuilder()
-              .setCustomId(`vitoria_time2_${filaId}`)
-              .setLabel('Vitória Time 2')
-              .setStyle(ButtonStyle.Primary)
-              .setEmoji('🏆'),
-            new ButtonBuilder()
-              .setCustomId(`cancelar_partida_${filaId}`)
-              .setLabel('Cancelar Partida')
-              .setStyle(ButtonStyle.Danger)
-              .setEmoji('❌')
-          );
-
         await privateChannel.send({
           content: mediadorSelecionado ? `<@${mediadorSelecionado.userId}> - Mediador responsável por esta partida` : '⚠️ Nenhum mediador ativo disponível',
           embeds: [pixEmbed],
           components: [matchRow]
         });
+        
+        console.log(`[FILA] PIX e botões de gerenciamento enviados no canal ${privateChannel.id}`);
+      } else {
+        // Mesmo sem PIX, enviar os botões de gerenciamento
+        const nPixEmbed = new EmbedBuilder()
+          .setTitle('⚠️ PIX Não Configurado')
+          .setDescription(
+            `O PIX ainda não foi configurado.\n\n` +
+            `Entre em contato com a administração para configurar o pagamento.`
+          )
+          .setColor(COLORS.WARNING)
+          .setTimestamp();
+
+        await privateChannel.send({
+          content: mediadorSelecionado ? `<@${mediadorSelecionado.userId}> - Mediador responsável por esta partida` : '⚠️ Nenhum mediador ativo disponível',
+          embeds: [nPixEmbed],
+          components: [matchRow]
+        });
+        
+        console.log(`[FILA] Botões de gerenciamento enviados (sem PIX) no canal ${privateChannel.id}`);
       }
+    }
+
+    // REMOVER FILA DO BANCO DE DADOS (jogadores já estão no canal privado)
+    try {
+      await db.deleteItem('filas', f => f.id === filaId);
+      console.log(`[FILA] Fila ${filaId} removida do banco de dados após criar canal privado`);
+    } catch (error) {
+      console.error(`[FILA] Erro ao remover fila ${filaId} do banco:`, error);
     }
 
     // ENVIAR DM PARA TODOS OS JOGADORES
