@@ -354,7 +354,7 @@ module.exports = {
     // Atualizar fila: salvar jogadores da partida e resetar lista para novos jogadores
     await db.updateItem('filas', f => f.id === filaId, f => ({
       ...f,
-      status: 'aberta', // Voltar para aberta imediatamente
+      status: 'em_andamento', // Partida em andamento no canal privado
       jogadores: [], // Esvaziar para aceitar novos jogadores
       preferencias: {},
       jogadoresPartida: [...todosJogadores], // Salvar jogadores da partida atual
@@ -621,6 +621,7 @@ module.exports = {
       // Limpar apenas dados da partida finalizada (jogadores já foram resetados)
       await db.updateItem('filas', f => f.id === filaId, f => ({
         ...f,
+        status: 'aberta', // Voltar para aberta após finalizar
         jogadoresPartida: [], // Limpar jogadores da partida finalizada
         mediadorId: null,
         canalPrivadoId: null,
@@ -1199,9 +1200,18 @@ module.exports = {
       });
     }
 
+    // Usar jogadoresPartida ao invés de jogadores (que foi esvaziado)
+    const jogadoresDaPartida = fila.jogadoresPartida || [];
+    
+    if (jogadoresDaPartida.length === 0) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Nenhum jogador encontrado nesta partida.')]
+      });
+    }
+
     // Calcular valores (baseado em metade dos jogadores)
     const valorPorJogador = fila.valor;
-    const metadeJogadores = fila.jogadores.length / 2;
+    const metadeJogadores = jogadoresDaPartida.length / 2;
     const totalTime = valorPorJogador * metadeJogadores;
     const valorReceber = totalTime * 2;
 
@@ -1231,7 +1241,7 @@ module.exports = {
       )
       .addFields({
         name: '👥 Jogadores da Partida',
-        value: fila.jogadores.map(id => `<@${id}>`).join('\n'),
+        value: jogadoresDaPartida.map(id => `<@${id}>`).join('\n'),
         inline: false
       })
       .setColor(COLORS.SUCCESS)
@@ -1293,9 +1303,18 @@ module.exports = {
       });
     }
 
+    // Usar jogadoresPartida ao invés de jogadores (que foi esvaziado)
+    const jogadoresDaPartida = fila.jogadoresPartida || [];
+    
+    if (jogadoresDaPartida.length === 0) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Nenhum jogador encontrado nesta partida.')]
+      });
+    }
+
     // Calcular valores (baseado em metade dos jogadores)
     const valorPorJogador = fila.valor;
-    const metadeJogadores = fila.jogadores.length / 2;
+    const metadeJogadores = jogadoresDaPartida.length / 2;
     const totalTime = valorPorJogador * metadeJogadores;
     const valorReceber = totalTime * 2;
 
@@ -1325,7 +1344,7 @@ module.exports = {
       )
       .addFields({
         name: '👥 Jogadores da Partida',
-        value: fila.jogadores.map(id => `<@${id}>`).join('\n'),
+        value: jogadoresDaPartida.map(id => `<@${id}>`).join('\n'),
         inline: false
       })
       .setColor(COLORS.SUCCESS)
