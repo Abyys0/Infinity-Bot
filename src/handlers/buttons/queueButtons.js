@@ -1187,10 +1187,11 @@ module.exports = {
   async handleVitoriaTime1(interaction) {
     const permissions = require('../../config/permissions');
     
-    // Verificar permissão
-    if (!permissions.isMediador(interaction.member) && !permissions.isAnalista(interaction.member)) {
+    // Verificar permissão - apenas mediadores
+    const isMed = await permissions.isMediador(interaction.member);
+    if (!isMed) {
       return interaction.reply({
-        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores e analistas podem confirmar vitórias.')],
+        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores podem confirmar vitórias.')],
         flags: 64
       });
     }
@@ -1290,10 +1291,11 @@ module.exports = {
   async handleVitoriaTime2(interaction) {
     const permissions = require('../../config/permissions');
     
-    // Verificar permissão
-    if (!permissions.isMediador(interaction.member) && !permissions.isAnalista(interaction.member)) {
+    // Verificar permissão - apenas mediadores
+    const isMed = await permissions.isMediador(interaction.member);
+    if (!isMed) {
       return interaction.reply({
-        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores e analistas podem confirmar vitórias.')],
+        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores podem confirmar vitórias.')],
         flags: 64
       });
     }
@@ -1392,10 +1394,11 @@ module.exports = {
   async handleCancelarPartida(interaction) {
     const permissions = require('../../config/permissions');
     
-    // Verificar permissão
-    if (!permissions.isMediador(interaction.member) && !permissions.isAnalista(interaction.member)) {
+    // Verificar permissão - apenas mediadores
+    const isMed = await permissions.isMediador(interaction.member);
+    if (!isMed) {
       return interaction.reply({
-        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores e analistas podem cancelar partidas.')],
+        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores podem cancelar partidas.')],
         flags: 64
       });
     }
