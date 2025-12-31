@@ -351,47 +351,55 @@ module.exports = {
       privateChannel = null;
     }
 
-    // Atualizar fila para status "em_andamento" (não resetar ainda)
+    // Atualizar fila: salvar jogadores da partida e resetar lista para novos jogadores
     await db.updateItem('filas', f => f.id === filaId, f => ({
       ...f,
-      status: 'em_andamento',
-      jogadoresPartida: [...todosJogadores], // Salvar jogadores da partida
+      status: 'aberta', // Voltar para aberta imediatamente
+      jogadores: [], // Esvaziar para aceitar novos jogadores
+      preferencias: {},
+      jogadoresPartida: [...todosJogadores], // Salvar jogadores da partida atual
       iniciadaEm: Date.now(),
       mediadorId: mediadorSelecionado?.userId || null,
       canalPrivadoId: privateChannel?.id || null
     }));
 
-    // Atualizar mensagem no canal de filas
+    console.log(`[FILA] Fila ${filaId} resetada - jogadores movidos para partida, painel pronto para novos jogadores`);
+
+    // Atualizar mensagem no canal de filas - MANTER BOTÕES ATIVOS
     const message = await interaction.channel.messages.fetch(fila.messageId);
-    const confirmaEmbed = new EmbedBuilder()
-      .setTitle(`${EMOJIS.SUCCESS} Fila Completa!`)
+    const maxJogadores = QUEUE_TYPES[fila.tipo]?.players || 2;
+    
+    const filaResetadaEmbed = new EmbedBuilder()
+      .setColor(COLORS.PRIMARY)
+      .setTitle(`${EMOJIS.GAME} ${fila.tipo} ${fila.plataforma}`)
       .setDescription(
-        `**Fila ID:** \`${filaId}\`\n` +
-        `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
         `**Valor:** R$ ${fila.valor}\n` +
-        `**Jogadores:** ${todosJogadores.length}\n\n` +
-        (privateChannel ? `**Canal da Partida:** <#${privateChannel.id}>` : `**Status:** Partida iniciada!`)
+        `**Jogadores necessários:** ${maxJogadores}\n\n` +
+        `✅ **Última partida:** <#${privateChannel?.id || 'Canal criado'}>`
       )
-      .addFields({
-        name: '👥 Jogadores',
-        value: todosJogadores.map(id => `<@${id}>`).join('\n'),
-        inline: false
-      })
-      .setColor(COLORS.SUCCESS)
+      .addFields(
+        { name: '⚔️ MODO', value: `${fila.tipo}`, inline: true },
+        { name: '💵 VALOR', value: `R$ ${fila.valor}`, inline: true },
+        { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
+      )
       .setTimestamp();
 
-    if (mediadorSelecionado) {
-      confirmaEmbed.addFields({
-        name: `${EMOJIS.MEDIATOR} Mediador Responsável`,
-        value: `<@${mediadorSelecionado.userId}>`,
-        inline: false
-      });
-    }
+    // Recriar botões IMEDIATAMENTE
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`entrar_fila_${filaId}`)
+          .setLabel('✅ Entrar na Fila')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`sair_fila_${filaId}`)
+          .setLabel('❌ Sair da Fila')
+          .setStyle(ButtonStyle.Danger)
+      );
 
-    // Mostrar que a fila completou (não resetar ainda - esperar partida terminar)
     await message.edit({ 
-      embeds: [confirmaEmbed], 
-      components: [] 
+      embeds: [filaResetadaEmbed], 
+      components: [row]
     });
 
     // ====== ENVIAR MENSAGENS NO CANAL PRIVADO ======
@@ -591,7 +599,7 @@ module.exports = {
   },
 
   /**
-   * Reseta a fila após a partida terminar
+   * Limpa dados da partida finalizada (jogadores já foram resetados ao iniciar)
    */
   async resetarFilaAposPartida(filaId, messageId, channelId, client) {
     try {
@@ -599,65 +607,22 @@ module.exports = {
       const fila = filas.find(f => f.id === filaId);
       
       if (!fila) {
-        console.log(`[FILA] Fila ${filaId} não encontrada para resetar`);
+        console.log(`[FILA] Fila ${filaId} não encontrada para limpar dados da partida`);
         return;
       }
 
-      // Resetar fila no banco
+      // Limpar apenas dados da partida finalizada (jogadores já foram resetados)
       await db.updateItem('filas', f => f.id === filaId, f => ({
         ...f,
-        jogadores: [],
-        jogadoresPartida: [],
-        preferencias: {},
-        status: 'aberta',
+        jogadoresPartida: [], // Limpar jogadores da partida finalizada
         mediadorId: null,
         canalPrivadoId: null,
         iniciadaEm: null
       }));
 
-      console.log(`[FILA] Fila ${filaId} resetada após término da partida`);
-
-      // Atualizar painel da fila
-      try {
-        const channel = await client.channels.fetch(channelId);
-        const message = await channel.messages.fetch(messageId);
-        
-        const maxJogadores = QUEUE_TYPES[fila.tipo]?.players || 2;
-        const resetEmbed = new EmbedBuilder()
-          .setColor(COLORS.PRIMARY)
-          .setTitle(`${EMOJIS.GAME} ${fila.tipo} ${fila.plataforma}`)
-          .setDescription(`**Valor:** R$ ${fila.valor}\n**Jogadores necessários:** ${maxJogadores}`)
-          .addFields(
-            { name: '⚔️ MODO', value: `${fila.tipo}`, inline: true },
-            { name: '💵 VALOR', value: `R$ ${fila.valor}`, inline: true },
-            { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
-          )
-          .setTimestamp();
-
-        // Recriar botões
-        const row = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId(`entrar_fila_${filaId}`)
-              .setLabel('✅ Entrar na Fila')
-              .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-              .setCustomId(`sair_fila_${filaId}`)
-              .setLabel('❌ Sair da Fila')
-              .setStyle(ButtonStyle.Danger)
-          );
-
-        await message.edit({
-          embeds: [resetEmbed],
-          components: [row]
-        });
-
-        console.log(`[FILA] Painel ${filaId} resetado e reativado para novas partidas`);
-      } catch (error) {
-        console.error(`[FILA] Erro ao atualizar painel da fila ${filaId}:`, error);
-      }
+      console.log(`[FILA] Dados da partida ${filaId} limpos após finalização`);
     } catch (error) {
-      console.error(`[FILA] Erro ao resetar fila ${filaId}:`, error);
+      console.error(`[FILA] Erro ao limpar dados da partida ${filaId}:`, error);
     }
   },
 
