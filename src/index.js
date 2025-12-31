@@ -9,6 +9,7 @@ const { handleModal } = require('./handlers/modalHandler');
 const { handleMessage } = require('./handlers/messageHandler');
 const { handleSelectMenu } = require('./handlers/selectMenuHandler');
 const { startMediatorRenewalChecker } = require('./services/mediadorService');
+const rankingService = require('./services/rankingService');
 const logger = require('./utils/logger');
 
 // Iniciar servidor HTTP para Render (keep-alive)
@@ -72,6 +73,9 @@ client.once('clientReady', async () => {
 
   // Iniciar verificador de renovação de mediadores
   startMediatorRenewalChecker(client);
+  
+  // Inicializar sistema de ranking automático
+  await rankingService.initialize(client);
   
   console.log('✅ Sistema totalmente iniciado!\n');
 });
@@ -149,6 +153,21 @@ process.on('unhandledRejection', (error) => {
 process.on('uncaughtException', (error) => {
   console.error('❌ Erro não capturado (uncaughtException):', error);
   process.exit(1);
+});
+
+// Shutdown graceful
+process.on('SIGINT', () => {
+  console.log('\n🔄 Encerrando bot...');
+  rankingService.stop();
+  client.destroy();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🔄 Encerrando bot...');
+  rankingService.stop();
+  client.destroy();
+  process.exit(0);
 });
 
 // Login

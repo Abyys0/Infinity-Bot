@@ -1,14 +1,16 @@
 // Handler de botões de confirmação de fila
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { createErrorEmbed, createSuccessEmbed } = require('../../utils/embeds');
 const { EMOJIS, COLORS, QUEUE_TYPES } = require('../../config/constants');
 const db = require('../../database');
 const logger = require('../../utils/logger');
 const { getActiveMediadores } = require('../../services/mediadorService');
+const rankingService = require('../../services/rankingService');
 
 /**
  * Processa a confirmação completa da fila quando todos confirmam
+ * NOVO: Cria automaticamente canal privado (inspirado no Sharingan)
  */
 async function processarFilaConfirmada(interaction, fila, filaId) {
   // Selecionar mediador ativo
@@ -17,17 +19,6 @@ async function processarFilaConfirmada(interaction, fila, filaId) {
   const mediadorSelecionado = mediadoresOnDuty.length > 0 
     ? mediadoresOnDuty[Math.floor(Math.random() * mediadoresOnDuty.length)]
     : null;
-
-  // Atualizar status da fila
-  await db.updateItem('filas',
-    f => f.id === filaId,
-    f => ({
-      ...f,
-      status: 'confirmada',
-      confirmadaEm: Date.now(),
-      mediadorId: mediadorSelecionado?.userId || null
-    })
-  );
 
   // Buscar dados do PIX - priorizar PIX do mediador que está atendendo
   let pixInfo = null;
@@ -59,7 +50,93 @@ async function processarFilaConfirmada(interaction, fila, filaId) {
   const taxaMediador = Math.ceil(totalTime * 0.10); // 10% para mediador
   const valorFinal = totalTime - taxaMediador;
 
-  // Atualizar mensagem original
+  // ====== NOVO: CRIAR CANAL PRIVADO AUTOMATICAMENTE ======
+  const guild = interaction.guild;
+  const category = interaction.channel.parent; // Usar mesma categoria do canal de fila
+  
+  // Criar nome do canal
+  const channelName = `partida-${fila.tipo.toLowerCase()}-${fila.valor}`;
+  
+  // Configurar permissões
+  const permissionOverwrites = [
+    {
+      id: guild.id,
+      deny: [PermissionFlagsBits.ViewChannel] // Negar acesso para @everyone
+    }
+  ];
+
+  // Adicionar permissões para jogadores dos dois times
+  const allPlayers = [...fila.time1, ...fila.time2];
+  allPlayers.forEach(playerId => {
+    permissionOverwrites.push({
+      id: playerId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory
+      ]
+    });
+  });
+
+  // Adicionar permissão para o mediador
+  if (mediadorSelecionado) {
+    permissionOverwrites.push({
+      id: mediadorSelecionado.userId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageMessages
+      ]
+    });
+  }
+
+  // Buscar roles de staff para adicionar permissões
+  const config = await db.readData('config');
+  const staffRoles = [...(config.roles?.mediador || []), ...(config.roles?.analista || []), ...(config.roles?.staff || [])];
+  staffRoles.forEach(roleId => {
+    permissionOverwrites.push({
+      id: roleId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageMessages
+      ]
+    });
+  });
+
+  // Criar canal privado
+  let privateChannel;
+  try {
+    privateChannel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      parent: category?.id || null,
+      permissionOverwrites: permissionOverwrites,
+      topic: `Partida ${fila.tipo} - R$ ${fila.valor} | Fila ID: ${filaId}`
+    });
+
+    logger.info(`[FILA] Canal privado criado: ${privateChannel.name} (${privateChannel.id})`);
+  } catch (error) {
+    logger.error('[FILA] Erro ao criar canal privado:', error);
+    // Se falhar, continuar sem canal privado
+    privateChannel = null;
+  }
+
+  // Atualizar status da fila com o canal privado
+  await db.updateItem('filas',
+    f => f.id === filaId,
+    f => ({
+      ...f,
+      status: 'confirmada',
+      confirmadaEm: Date.now(),
+      mediadorId: mediadorSelecionado?.userId || null,
+      canalPrivadoId: privateChannel?.id || null
+    })
+  );
+
+  // Atualizar mensagem original no canal de filas
   const confirmadaEmbed = new EmbedBuilder()
     .setTitle(`${EMOJIS.SUCCESS} Fila Confirmada`)
     .setDescription(
@@ -67,7 +144,7 @@ async function processarFilaConfirmada(interaction, fila, filaId) {
       `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
       `**Jogadores:** ${fila.time1.length + fila.time2.length}\n\n` +
       `${EMOJIS.SUCCESS} Todos os jogadores confirmaram!\n` +
-      `**Status:** Aguardando pagamento...`
+      (privateChannel ? `**Canal da Partida:** <#${privateChannel.id}>` : `**Status:** Aguardando pagamento...`)
     )
     .addFields(
       { 
@@ -79,16 +156,6 @@ async function processarFilaConfirmada(interaction, fila, filaId) {
         name: '❄️ Time 2 (Gelo Normal)', 
         value: fila.time2.map(id => `<@${id}>`).join('\n'), 
         inline: true 
-      },
-      {
-        name: `${EMOJIS.MONEY} Informações de Pagamento`,
-        value: 
-          `**Valor por jogador:** R$ ${valorPorJogador.toFixed(2)}\n` +
-          `**Total do time:** R$ ${totalTime.toFixed(2)}\n` +
-          `**Valor a receber (se ganhar):** R$ ${valorReceber.toFixed(2)}\n` +
-          `**Taxa mediador:** R$ ${taxaMediador.toFixed(2)}\n` +
-          `**Valor final (cada time):** R$ ${valorFinal.toFixed(2)}`,
-        inline: false
       }
     )
     .setColor(COLORS.SUCCESS)
@@ -126,22 +193,73 @@ async function processarFilaConfirmada(interaction, fila, filaId) {
       pixEmbed.setImage(pixInfo.imagemUrl);
     }
 
-    // Botão para mediador confirmar pagamento
-    const mediadorRow = new ActionRowBuilder()
+    // Botões para gerenciar a partida
+    const matchRow = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
           .setCustomId(`confirmar_pagamento_${filaId}`)
-          .setLabel('Confirmar Pagamento Recebido')
+          .setLabel('Confirmar Pagamento')
           .setStyle(ButtonStyle.Success)
-          .setEmoji(EMOJIS.MONEY)
+          .setEmoji(EMOJIS.MONEY),
+        new ButtonBuilder()
+          .setCustomId(`vitoria_time1_${filaId}`)
+          .setLabel('Vitória Time 1')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🔥'),
+        new ButtonBuilder()
+          .setCustomId(`vitoria_time2_${filaId}`)
+          .setLabel('Vitória Time 2')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('❄️'),
+        new ButtonBuilder()
+          .setCustomId(`cancelar_partida_${filaId}`)
+          .setLabel('Cancelar Partida')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('❌')
       );
 
-    // Enviar informações do PIX no canal
-    const channel = await interaction.guild.channels.fetch(filaId);
-    await channel.send({
-      content: mediadorSelecionado ? `<@${mediadorSelecionado.userId}> - Mediador responsável por esta fila` : '⚠️ Nenhum mediador ativo disponível',
+    // Enviar informações no CANAL PRIVADO (se existir) ou no canal público
+    const targetChannel = privateChannel || (await interaction.guild.channels.fetch(filaId));
+    
+    // Criar embed de boas-vindas para o canal privado
+    if (privateChannel) {
+      const welcomeEmbed = new EmbedBuilder()
+        .setTitle(`🎮 Partida Iniciada - ${fila.tipo} ${fila.plataforma}`)
+        .setDescription(
+          `Bem-vindos ao canal privado da partida!\n\n` +
+          `**📋 Informações da Partida**\n` +
+          `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
+          `**Valor:** R$ ${fila.valor} por jogador\n` +
+          `**Total por time:** R$ ${totalTime.toFixed(2)}\n` +
+          `**Valor a receber (vencedor):** R$ ${valorReceber.toFixed(2)}\n\n` +
+          (mediadorSelecionado ? `**Mediador:** <@${mediadorSelecionado.userId}>\n\n` : '') +
+          `${EMOJIS.QUEUE} **Aguardando pagamento dos times...**`
+        )
+        .addFields(
+          { 
+            name: '🔥 Time 1 (Gelo Infinito)', 
+            value: fila.time1.map(id => `<@${id}>`).join('\n'), 
+            inline: true 
+          },
+          { 
+            name: '❄️ Time 2 (Gelo Normal)', 
+            value: fila.time2.map(id => `<@${id}>`).join('\n'), 
+            inline: true 
+          }
+        )
+        .setColor(COLORS.PRIMARY)
+        .setTimestamp();
+
+      await targetChannel.send({ 
+        content: allPlayers.map(id => `<@${id}>`).join(' ') + (mediadorSelecionado ? ` <@${mediadorSelecionado.userId}>` : ''),
+        embeds: [welcomeEmbed] 
+      });
+    }
+
+    await targetChannel.send({
+      content: mediadorSelecionado ? `<@${mediadorSelecionado.userId}> - Mediador responsável por esta partida` : '⚠️ Nenhum mediador ativo disponível',
       embeds: [pixEmbed],
-      components: [mediadorRow]
+      components: [matchRow]
     });
   }
 
@@ -152,7 +270,8 @@ async function processarFilaConfirmada(interaction, fila, filaId) {
 
   return {
     success: true,
-    pixInfo: pixInfo !== null
+    pixInfo: pixInfo !== null,
+    privateChannel: privateChannel
   };
 }
 
@@ -193,6 +312,21 @@ module.exports = {
     // cancel_queue_FILAID
     if (customId.startsWith('cancel_queue_')) {
       return await this.handleCancelarFila(interaction);
+    }
+
+    // vitoria_time1_FILAID - Novo
+    if (customId.startsWith('vitoria_time1_')) {
+      return await this.handleVitoriaTime1(interaction);
+    }
+
+    // vitoria_time2_FILAID - Novo
+    if (customId.startsWith('vitoria_time2_')) {
+      return await this.handleVitoriaTime2(interaction);
+    }
+
+    // cancelar_partida_FILAID - Novo
+    if (customId.startsWith('cancelar_partida_')) {
+      return await this.handleCancelarPartida(interaction);
     }
 
     await interaction.reply({
@@ -1044,5 +1178,285 @@ module.exports = {
       content: `Você selecionou **R$ ${valor}**. Escolha o tipo de jogo:`,
       components: [row],
       flags: 64
-    });  }
+    });
+  },
+
+  /**
+   * Handler para vitória do Time 1 (integração com ranking)
+   */
+  async handleVitoriaTime1(interaction) {
+    const permissions = require('../../config/permissions');
+    
+    // Verificar permissão
+    if (!permissions.isMediador(interaction.member) && !permissions.isAnalista(interaction.member)) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores e analistas podem confirmar vitórias.')],
+        flags: 64
+      });
+    }
+
+    const filaId = interaction.customId.replace('vitoria_time1_', '');
+    await interaction.deferReply({ flags: 64 });
+
+    const fila = await db.findItem('filas', f => f.id === filaId);
+    if (!fila) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Fila não encontrada.')]
+      });
+    }
+
+    // Calcular valores
+    const valorPorJogador = fila.valor;
+    const totalTime = valorPorJogador * fila.time1.length;
+    const valorReceber = totalTime * 2;
+
+    // Atualizar ranking para os vencedores (Time 1)
+    for (const playerId of fila.time1) {
+      await rankingService.addVictory(playerId, valorReceber / fila.time1.length);
+    }
+
+    // Atualizar ranking para os perdedores (Time 2)
+    for (const playerId of fila.time2) {
+      await rankingService.addDefeat(playerId, totalTime / fila.time2.length);
+    }
+
+    // Atualizar status da fila
+    await db.updateItem('filas',
+      f => f.id === filaId,
+      f => ({
+        ...f,
+        status: 'finalizada',
+        vencedor: 'time1',
+        finalizadaEm: Date.now(),
+        finalizadoPor: interaction.user.id
+      })
+    );
+
+    // Criar embed de vitória
+    const vitoriaEmbed = new EmbedBuilder()
+      .setTitle('🏆 VITÓRIA - TIME 1 (GELO INFINITO)')
+      .setDescription(
+        `**Fila ID:** \`${filaId}\`\n` +
+        `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
+        `**Valor:** R$ ${fila.valor}\n\n` +
+        `${EMOJIS.SUCCESS} Time 1 venceu a partida!\n` +
+        `**Valor recebido por jogador:** R$ ${(valorReceber / fila.time1.length).toFixed(2)}\n\n` +
+        `🏆 **Ranking atualizado automaticamente!**`
+      )
+      .addFields(
+        { 
+          name: '🔥 Vencedores (Time 1)', 
+          value: fila.time1.map(id => `<@${id}>`).join('\n'), 
+          inline: true 
+        },
+        { 
+          name: '❄️ Perdedores (Time 2)', 
+          value: fila.time2.map(id => `<@${id}>`).join('\n'), 
+          inline: true 
+        }
+      )
+      .setColor(COLORS.SUCCESS)
+      .setTimestamp();
+
+    // Deletar canal privado se existir
+    if (fila.canalPrivadoId) {
+      try {
+        const privateChannel = await interaction.guild.channels.fetch(fila.canalPrivadoId);
+        if (privateChannel) {
+          await privateChannel.send({ embeds: [vitoriaEmbed] });
+          
+          // Aguardar 30 segundos antes de deletar
+          setTimeout(async () => {
+            try {
+              await privateChannel.delete();
+              logger.info(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
+            } catch (error) {
+              logger.error('[FILA] Erro ao deletar canal privado:', error);
+            }
+          }, 30000);
+        }
+      } catch (error) {
+        logger.error('[FILA] Erro ao acessar canal privado:', error);
+      }
+    }
+
+    await interaction.editReply({
+      embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 1 confirmada! Ranking atualizado.`)]
+    });
+  },
+
+  /**
+   * Handler para vitória do Time 2 (integração com ranking)
+   */
+  async handleVitoriaTime2(interaction) {
+    const permissions = require('../../config/permissions');
+    
+    // Verificar permissão
+    if (!permissions.isMediador(interaction.member) && !permissions.isAnalista(interaction.member)) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores e analistas podem confirmar vitórias.')],
+        flags: 64
+      });
+    }
+
+    const filaId = interaction.customId.replace('vitoria_time2_', '');
+    await interaction.deferReply({ flags: 64 });
+
+    const fila = await db.findItem('filas', f => f.id === filaId);
+    if (!fila) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Fila não encontrada.')]
+      });
+    }
+
+    // Calcular valores
+    const valorPorJogador = fila.valor;
+    const totalTime = valorPorJogador * fila.time2.length;
+    const valorReceber = totalTime * 2;
+
+    // Atualizar ranking para os vencedores (Time 2)
+    for (const playerId of fila.time2) {
+      await rankingService.addVictory(playerId, valorReceber / fila.time2.length);
+    }
+
+    // Atualizar ranking para os perdedores (Time 1)
+    for (const playerId of fila.time1) {
+      await rankingService.addDefeat(playerId, totalTime / fila.time1.length);
+    }
+
+    // Atualizar status da fila
+    await db.updateItem('filas',
+      f => f.id === filaId,
+      f => ({
+        ...f,
+        status: 'finalizada',
+        vencedor: 'time2',
+        finalizadaEm: Date.now(),
+        finalizadoPor: interaction.user.id
+      })
+    );
+
+    // Criar embed de vitória
+    const vitoriaEmbed = new EmbedBuilder()
+      .setTitle('🏆 VITÓRIA - TIME 2 (GELO NORMAL)')
+      .setDescription(
+        `**Fila ID:** \`${filaId}\`\n` +
+        `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
+        `**Valor:** R$ ${fila.valor}\n\n` +
+        `${EMOJIS.SUCCESS} Time 2 venceu a partida!\n` +
+        `**Valor recebido por jogador:** R$ ${(valorReceber / fila.time2.length).toFixed(2)}\n\n` +
+        `🏆 **Ranking atualizado automaticamente!**`
+      )
+      .addFields(
+        { 
+          name: '❄️ Vencedores (Time 2)', 
+          value: fila.time2.map(id => `<@${id}>`).join('\n'), 
+          inline: true 
+        },
+        { 
+          name: '🔥 Perdedores (Time 1)', 
+          value: fila.time1.map(id => `<@${id}>`).join('\n'), 
+          inline: true 
+        }
+      )
+      .setColor(COLORS.SUCCESS)
+      .setTimestamp();
+
+    // Deletar canal privado se existir
+    if (fila.canalPrivadoId) {
+      try {
+        const privateChannel = await interaction.guild.channels.fetch(fila.canalPrivadoId);
+        if (privateChannel) {
+          await privateChannel.send({ embeds: [vitoriaEmbed] });
+          
+          // Aguardar 30 segundos antes de deletar
+          setTimeout(async () => {
+            try {
+              await privateChannel.delete();
+              logger.info(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
+            } catch (error) {
+              logger.error('[FILA] Erro ao deletar canal privado:', error);
+            }
+          }, 30000);
+        }
+      } catch (error) {
+        logger.error('[FILA] Erro ao acessar canal privado:', error);
+      }
+    }
+
+    await interaction.editReply({
+      embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 2 confirmada! Ranking atualizado.`)]
+    });
+  },
+
+  /**
+   * Handler para cancelar partida
+   */
+  async handleCancelarPartida(interaction) {
+    const permissions = require('../../config/permissions');
+    
+    // Verificar permissão
+    if (!permissions.isMediador(interaction.member) && !permissions.isAnalista(interaction.member)) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Sem Permissão', 'Apenas mediadores e analistas podem cancelar partidas.')],
+        flags: 64
+      });
+    }
+
+    const filaId = interaction.customId.replace('cancelar_partida_', '');
+    await interaction.deferReply({ flags: 64 });
+
+    const fila = await db.findItem('filas', f => f.id === filaId);
+    if (!fila) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Erro', 'Fila não encontrada.')]
+      });
+    }
+
+    // Atualizar status
+    await db.updateItem('filas',
+      f => f.id === filaId,
+      f => ({
+        ...f,
+        status: 'cancelada',
+        canceladoPor: interaction.user.id,
+        canceladoEm: Date.now()
+      })
+    );
+
+    // Deletar canal privado se existir
+    if (fila.canalPrivadoId) {
+      try {
+        const privateChannel = await interaction.guild.channels.fetch(fila.canalPrivadoId);
+        if (privateChannel) {
+          const cancelEmbed = new EmbedBuilder()
+            .setTitle('❌ PARTIDA CANCELADA')
+            .setDescription(
+              `Esta partida foi cancelada por ${interaction.user}.\n\n` +
+              `Este canal será deletado em 30 segundos.`
+            )
+            .setColor(COLORS.ERROR)
+            .setTimestamp();
+
+          await privateChannel.send({ embeds: [cancelEmbed] });
+          
+          // Aguardar 30 segundos antes de deletar
+          setTimeout(async () => {
+            try {
+              await privateChannel.delete();
+              logger.info(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após cancelamento`);
+            } catch (error) {
+              logger.error('[FILA] Erro ao deletar canal privado:', error);
+            }
+          }, 30000);
+        }
+      } catch (error) {
+        logger.error('[FILA] Erro ao acessar canal privado:', error);
+      }
+    }
+
+    await interaction.editReply({
+      embeds: [createSuccessEmbed('Partida Cancelada', `${EMOJIS.SUCCESS} A partida foi cancelada com sucesso.`)]
+    });
+  }
 };
