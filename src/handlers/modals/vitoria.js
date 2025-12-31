@@ -129,13 +129,12 @@ async function handleVitoriaModal(interaction) {
       `**Tipo:** ${fila.tipo} ${fila.plataforma}\n` +
       `**Valor por jogador:** R$ ${fila.valor}\n\n` +
       `👥 **Jogadores da Partida:**\n${jogadoresDaPartida.map(id => id === vencedorId ? `🥇 <@${id}> (Vencedor)` : `❌ <@${id}>`).join('\n')}\n\n` +
-      `✅ **Mediador:** ${interaction.user}\n` +
-      `⏰ Este canal será deletado em 30 segundos.`
+      `✅ **Mediador:** ${interaction.user}`
     )
     .setColor(COLORS.SUCCESS)
     .setTimestamp();
 
-  // Enviar no canal e agendar deleção
+  // Enviar no canal privado
   if (fila.canalPrivadoId) {
     try {
       const privateChannel = await interaction.guild.channels.fetch(fila.canalPrivadoId);
@@ -144,20 +143,6 @@ async function handleVitoriaModal(interaction) {
           content: jogadoresDaPartida.map(id => `<@${id}>`).join(' '),
           embeds: [vitoriaEmbed] 
         });
-        
-        // Aguardar 30 segundos antes de deletar
-        setTimeout(async () => {
-          try {
-            await privateChannel.delete();
-            console.log(`[FILA] Canal privado ${fila.canalPrivadoId} deletado após vitória`);
-            
-            // Limpar dados da partida
-            const queueButtons = require('../buttons/queueButtons');
-            await queueButtons.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
-          } catch (error) {
-            console.error('[FILA] Erro ao deletar canal privado:', error);
-          }
-        }, 30000);
       }
     } catch (error) {
       console.error('[FILA] Erro ao acessar canal privado:', error);
@@ -168,7 +153,7 @@ async function handleVitoriaModal(interaction) {
     embeds: [createSuccessEmbed(
       'Vitória Registrada',
       `🏆 **Vencedor:** <@${vencedorId}>\n💰 **Valor:** R$ ${valorReceber.toFixed(2)}\n\n` +
-      `O resultado foi registrado no ranking e o canal será deletado em 30 segundos.`
+      `O resultado foi registrado no ranking.`
     )]
   });
 }
