@@ -1288,7 +1288,7 @@ module.exports = {
     }
 
     // Resetar fila após vitória
-    await this.resetarFilaAposPartida(filaId, fila.messageId, interaction.channel.id, interaction.client);
+    await this.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 1 confirmada!`)]
@@ -1381,7 +1381,7 @@ module.exports = {
     }
 
     // Resetar fila após vitória
-    await this.resetarFilaAposPartida(filaId, fila.messageId, interaction.channel.id, interaction.client);
+    await this.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Vitória Registrada', `${EMOJIS.SUCCESS} Vitória do Time 2 confirmada!`)]
@@ -1455,7 +1455,7 @@ module.exports = {
     }
 
     // Resetar fila após cancelamento
-    await this.resetarFilaAposPartida(filaId, fila.messageId, interaction.channel.id, interaction.client);
+    await this.resetarFilaAposPartida(filaId, fila.messageId, fila.channelId, interaction.client);
 
     await interaction.editReply({
       embeds: [createSuccessEmbed('Partida Cancelada', `${EMOJIS.SUCCESS} A partida foi cancelada com sucesso.`)]
