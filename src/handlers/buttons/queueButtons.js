@@ -416,14 +416,12 @@ module.exports = {
           .addComponents(
             new ButtonBuilder()
               .setCustomId(`entrar_fila_${filaId}`)
-              .setLabel('Entrar na Fila')
-              .setStyle(ButtonStyle.Success)
-              .setEmoji(EMOJIS.QUEUE),
+              .setLabel('✅ Entrar na Fila')
+              .setStyle(ButtonStyle.Success),
             new ButtonBuilder()
               .setCustomId(`sair_fila_${filaId}`)
-              .setLabel('Sair da Fila')
+              .setLabel('❌ Sair da Fila')
               .setStyle(ButtonStyle.Danger)
-              .setEmoji(EMOJIS.ERROR)
           );
 
         await message.edit({
