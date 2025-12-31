@@ -387,10 +387,55 @@ module.exports = {
       });
     }
 
+    // Mostrar temporariamente que a fila completou
     await message.edit({ 
       embeds: [confirmaEmbed], 
       components: [] 
     });
+
+    // Após 5 segundos, resetar o painel para ficar disponível novamente
+    setTimeout(async () => {
+      try {
+        const filaAtualizada = await db.readData('filas').then(filas => filas.find(f => f.id === filaId));
+        if (!filaAtualizada) return;
+
+        const maxJogadores = QUEUE_TYPES[filaAtualizada.tipo]?.players || 2;
+        const resetEmbed = new EmbedBuilder()
+          .setColor(COLORS.PRIMARY)
+          .setTitle(`${EMOJIS.GAME} ${filaAtualizada.tipo} ${filaAtualizada.plataforma}`)
+          .setDescription(`**Valor:** R$ ${filaAtualizada.valor}\n**Jogadores necessários:** ${maxJogadores}`)
+          .addFields(
+            { name: '⚔️ MODO', value: `${filaAtualizada.tipo}`, inline: true },
+            { name: '💵 VALOR', value: `R$ ${filaAtualizada.valor}`, inline: true },
+            { name: '👥 JOGADORES', value: 'Nenhum jogador na fila.', inline: false }
+          )
+          .setTimestamp();
+
+        // Recriar botões
+        const row = new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId(`entrar_fila_${filaId}`)
+              .setLabel('Entrar na Fila')
+              .setStyle(ButtonStyle.Success)
+              .setEmoji(EMOJIS.QUEUE),
+            new ButtonBuilder()
+              .setCustomId(`sair_fila_${filaId}`)
+              .setLabel('Sair da Fila')
+              .setStyle(ButtonStyle.Danger)
+              .setEmoji(EMOJIS.ERROR)
+          );
+
+        await message.edit({
+          embeds: [resetEmbed],
+          components: [row]
+        });
+
+        console.log(`[FILA] Painel ${filaId} resetado e reativado para novas partidas`);
+      } catch (error) {
+        console.error(`[FILA] Erro ao resetar painel da fila ${filaId}:`, error);
+      }
+    }, 5000);
 
     // ====== ENVIAR MENSAGENS NO CANAL PRIVADO ======
     if (privateChannel) {
@@ -522,12 +567,17 @@ module.exports = {
       }
     }
 
-    // REMOVER FILA DO BANCO DE DADOS (jogadores já estão no canal privado)
+    // RESETAR FILA (esvaziar jogadores mas manter o painel ativo)
     try {
-      await db.deleteItem('filas', f => f.id === filaId);
-      console.log(`[FILA] Fila ${filaId} removida do banco de dados após criar canal privado`);
+      await db.updateItem('filas', f => f.id === filaId, f => ({
+        ...f,
+        jogadores: [],
+        preferencias: {},
+        status: 'aberta'
+      }));
+      console.log(`[FILA] Fila ${filaId} resetada - jogadores removidos, painel mantido ativo`);
     } catch (error) {
-      console.error(`[FILA] Erro ao remover fila ${filaId} do banco:`, error);
+      console.error(`[FILA] Erro ao resetar fila ${filaId}:`, error);
     }
 
     // ENVIAR DM PARA TODOS OS JOGADORES
