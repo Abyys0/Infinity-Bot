@@ -197,9 +197,12 @@ module.exports = {
       embeds: [createSuccessEmbed('Entrou na Fila', `Você entrou na fila${opcaoTexto}! (${fila.jogadores.length}/${maxJogadores})`)]
     });
 
-    // Se completou, iniciar
+    // Se completou, iniciar (sem bloquear a resposta da interação)
     if (fila.jogadores.length === maxJogadores) {
-      await this.iniciarFila(interaction, fila, filaId);
+      // Executar em background para não bloquear a interação
+      this.iniciarFila(interaction, fila, filaId).catch(error => {
+        logger.error('[FILA] Erro ao iniciar fila:', error);
+      });
     }
   },
 
@@ -252,55 +255,56 @@ module.exports = {
    * Inicia fila quando completada
    */
   async iniciarFila(interaction, fila, filaId) {
-    // NÃO dividir em times - os jogadores formam times no jogo
-    const todosJogadores = fila.jogadores;
+    try {
+      // NÃO dividir em times - os jogadores formam times no jogo
+      const todosJogadores = fila.jogadores;
 
-    // Selecionar mediador ativo
-    const mediadores = await getActiveMediadores();
-    const mediadoresOnDuty = mediadores.filter(m => m.onDuty);
-    const mediadorSelecionado = mediadoresOnDuty.length > 0 
-      ? mediadoresOnDuty[Math.floor(Math.random() * mediadoresOnDuty.length)]
-      : null;
+      // Selecionar mediador ativo
+      const mediadores = await getActiveMediadores();
+      const mediadoresOnDuty = mediadores.filter(m => m.onDuty);
+      const mediadorSelecionado = mediadoresOnDuty.length > 0 
+        ? mediadoresOnDuty[Math.floor(Math.random() * mediadoresOnDuty.length)]
+        : null;
 
-    // ====== CRIAR CANAL PRIVADO IMEDIATAMENTE ======
-    const guild = interaction.guild;
-    const category = interaction.channel.parent;
-    
-    // Criar nome do canal baseado na preferência da fila
-    let preferenciaNome = '';
-    const firstPlayer = fila.jogadores[0];
-    const preferencia = fila.preferencias[firstPlayer];
-    
-    if (preferencia) {
-      if (preferencia.includes('geloinfinito')) preferenciaNome = 'geloinf';
-      else if (preferencia.includes('gelonormal')) preferenciaNome = 'gelonorm';
-      else if (preferencia.includes('fullump')) preferenciaNome = 'fullump';
-      else if (preferencia.includes('misto')) preferenciaNome = 'misto';
-      else if (preferencia.includes('mobile')) preferenciaNome = 'mobile';
-      else if (preferencia.includes('emulador')) preferenciaNome = 'emu';
-    }
-    
-    const channelName = `partida-${fila.tipo.toLowerCase()}-${preferenciaNome}-${fila.valor}`;
-    
-    // Configurar permissões
-    const permissionOverwrites = [
-      {
-        id: guild.id,
-        deny: [PermissionFlagsBits.ViewChannel]
+      // ====== CRIAR CANAL PRIVADO IMEDIATAMENTE ======
+      const guild = interaction.guild;
+      const category = interaction.channel.parent;
+      
+      // Criar nome do canal baseado na preferência da fila
+      let preferenciaNome = '';
+      const firstPlayer = fila.jogadores[0];
+      const preferencia = fila.preferencias[firstPlayer];
+      
+      if (preferencia) {
+        if (preferencia.includes('geloinfinito')) preferenciaNome = 'geloinf';
+        else if (preferencia.includes('gelonormal')) preferenciaNome = 'gelonorm';
+        else if (preferencia.includes('fullump')) preferenciaNome = 'fullump';
+        else if (preferencia.includes('misto')) preferenciaNome = 'misto';
+        else if (preferencia.includes('mobile')) preferenciaNome = 'mobile';
+        else if (preferencia.includes('emulador')) preferenciaNome = 'emu';
       }
-    ];
+      
+      const channelName = `partida-${fila.tipo.toLowerCase()}-${preferenciaNome}-${fila.valor}`;
+      
+      // Configurar permissões
+      const permissionOverwrites = [
+        {
+          id: guild.id,
+          deny: [PermissionFlagsBits.ViewChannel]
+        }
+      ];
 
-    // Adicionar permissões para todos os jogadores
-    todosJogadores.forEach(playerId => {
-      permissionOverwrites.push({
-        id: playerId,
-        allow: [
-          PermissionFlagsBits.ViewChannel,
-          PermissionFlagsBits.SendMessages,
-          PermissionFlagsBits.ReadMessageHistory
-        ]
+      // Adicionar permissões para todos os jogadores
+      todosJogadores.forEach(playerId => {
+        permissionOverwrites.push({
+          id: playerId,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory
+          ]
+        });
       });
-    });
 
     // Adicionar permissão para o mediador
     if (mediadorSelecionado) {
@@ -341,9 +345,9 @@ module.exports = {
         topic: `Partida ${fila.tipo} - R$ ${fila.valor} | Fila ID: ${filaId}`
       });
 
-      logger.info(`[FILA] Canal privado criado: ${privateChannel.name} (${privateChannel.id})`);
+      console.log(`[FILA] Canal privado criado: ${privateChannel.name} (${privateChannel.id})`);
     } catch (error) {
-      logger.error('[FILA] Erro ao criar canal privado:', error);
+      console.error('[FILA] Erro ao criar canal privado:', error);
       privateChannel = null;
     }
 
@@ -516,13 +520,50 @@ module.exports = {
           .setTimestamp();
 
         await user.send({ embeds: [dmEmbed] });
-        logger.log(`DM enviada para ${user.tag} sobre fila ${filaId}`);
+        console.log(`[DM] DM enviada para ${user.tag} sobre fila ${filaId}`);
       } catch (error) {
-        logger.error(`Erro ao enviar DM para ${userId}:`, error);
+        console.error(`[DM] Erro ao enviar DM para ${userId}:`, error);
       }
     }
 
-    logger.log(`Fila ${filaId} iniciada. DMs enviadas para ${todosJogadores.length} jogadores.`);
+    console.log(`[FILA] Fila ${filaId} iniciada. DMs enviadas para ${todosJogadores.length} jogadores.`);
+    } catch (error) {
+      console.error(`[FILA] Erro ao iniciar fila ${filaId}:`, error);
+      
+      // Tentar notificar no canal sobre o erro
+      try {
+        const message = await interaction.channel.messages.fetch(fila.messageId);
+        const errorEmbed = new EmbedBuilder()
+          .setTitle('❌ Erro ao Iniciar Fila')
+          .setDescription(
+            `Ocorreu um erro ao processar a fila.\n\n` +
+            `**Fila ID:** \`${filaId}\`\n` +
+            `**Erro:** ${error.message}\n\n` +
+            `Por favor, contate um administrador.`
+          )
+          .setColor(COLORS.ERROR)
+          .setTimestamp();
+        
+        await message.edit({ embeds: [errorEmbed], components: [] });
+        
+        // Notificar jogadores sobre o erro
+        for (const userId of fila.jogadores) {
+          try {
+            const user = await interaction.client.users.fetch(userId);
+            await user.send({
+              embeds: [createErrorEmbed(
+                'Erro na Fila',
+                `Houve um erro ao iniciar sua fila ${fila.tipo}. Por favor, entre em contato com a equipe.`
+              )]
+            });
+          } catch (dmError) {
+            console.error(`[FILA] Não foi possível notificar ${userId} sobre erro da fila`, dmError);
+          }
+        }
+      } catch (notifyError) {
+        console.error('[FILA] Erro ao notificar sobre erro da fila:', notifyError);
+      }
+    }
   },
 
   /**
