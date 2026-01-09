@@ -40,7 +40,16 @@ const INITIAL_DATA = {
   tickets: [],
   blacklist: [],
   ranking: [],
-  pixData: []
+  pixData: [],
+  produtos: [],
+  ticketsVenda: [],
+  vendasConfig: {
+    titulo: '🛒 Loja INFINITY',
+    descricao: 'Selecione um produto abaixo para realizar sua compra!',
+    pix: null,
+    canalPainel: null,
+    categoriaPainel: null
+  }
 };
 
 /**

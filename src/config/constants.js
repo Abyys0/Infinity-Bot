@@ -1,5 +1,20 @@
 // Constantes do INFINITY BOT
 
+// ============================================
+// CONFIGURAÇÃO DE FEATURES DESATIVADAS
+// Mude para false quando quiser reativar
+// ============================================
+const DISABLED_FEATURES = {
+  FILAS: true,              // Sistema de filas de apostado
+  PAINEL_DONO: true,        // Painel do dono (/painel)
+  PAINEL_MEDIADOR: true,    // Painel de mediador (/painelmediador)
+  PAINEL_ANALISTA: true,    // Painel de analista (/painelanalista)
+  PAINEL_FILA: true,        // Painel de fila (/painelfila)
+};
+
+// Mensagem padrão quando feature está desativada
+const DISABLED_MESSAGE = '🚫 **Sistema Temporariamente Desativado**\n\nEsta funcionalidade está temporariamente desativada pela administração.\n\nAguarde até que seja reativada.';
+
 // Cores dos embeds
 const COLORS = {
   PRIMARY: '#00CED1',      // Ciano INFINITY
@@ -120,5 +135,7 @@ module.exports = {
   QUEUE_STATUS,
   TICKET_STATUS,
   WIN_TYPES,
-  DEFAULT_BET_VALUES
+  DEFAULT_BET_VALUES,
+  DISABLED_FEATURES,
+  DISABLED_MESSAGE
 };

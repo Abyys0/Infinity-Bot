@@ -2,12 +2,20 @@
 
 const { EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const { createSuccessEmbed, createErrorEmbed, createInfoEmbed } = require('../../utils/embeds');
-const { EMOJIS, COLORS } = require('../../config/constants');
+const { EMOJIS, COLORS, DISABLED_FEATURES, DISABLED_MESSAGE } = require('../../config/constants');
 const permissions = require('../../config/permissions');
 const db = require('../../database');
 
 async function handle(interaction) {
   const customId = interaction.customId;
+
+  // Verificar se o painel de mediador está desativado
+  if (DISABLED_FEATURES.PAINEL_MEDIADOR) {
+    return interaction.reply({
+      embeds: [createErrorEmbed('Sistema Desativado', DISABLED_MESSAGE)],
+      flags: 64
+    });
+  }
 
   console.log('[MEDIADOR PAINEL] Botão clicado:', customId, 'por', interaction.user.tag);
 

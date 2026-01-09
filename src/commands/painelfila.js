@@ -3,7 +3,7 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { createErrorEmbed } = require('../utils/embeds');
 const permissions = require('../config/permissions');
-const { EMOJIS, COLORS } = require('../config/constants');
+const { EMOJIS, COLORS, DISABLED_FEATURES, DISABLED_MESSAGE } = require('../config/constants');
 const db = require('../database');
 
 module.exports = {
@@ -18,6 +18,13 @@ module.exports = {
   async execute(interaction) {
     // Defer IMEDIATAMENTE antes de qualquer operação
     await interaction.deferReply({ flags: 64 });
+
+    // Verificar se o painel de fila está desativado
+    if (DISABLED_FEATURES.PAINEL_FILA) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Sistema Desativado', DISABLED_MESSAGE)]
+      });
+    }
 
     // Verificar se é dono (sem await inline)
     const ehDono = await permissions.isOwner(interaction.user.id, interaction.member);

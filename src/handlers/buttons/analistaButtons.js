@@ -2,13 +2,21 @@
 
 const { EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const { createSuccessEmbed, createErrorEmbed, createInfoEmbed } = require('../../utils/embeds');
-const { ANALYST_TYPES, EMOJIS, COLORS } = require('../../config/constants');
+const { ANALYST_TYPES, EMOJIS, COLORS, DISABLED_FEATURES, DISABLED_MESSAGE } = require('../../config/constants');
 const permissions = require('../../config/permissions');
 const db = require('../../database');
 const logger = require('../../utils/logger');
 
 async function handle(interaction) {
   const customId = interaction.customId;
+
+  // Verificar se o painel de analista está desativado
+  if (DISABLED_FEATURES.PAINEL_ANALISTA) {
+    return interaction.reply({
+      embeds: [createErrorEmbed('Sistema Desativado', DISABLED_MESSAGE)],
+      flags: 64
+    });
+  }
 
   // analista_entrar_servico_mobile
   if (customId === 'analista_entrar_servico_mobile') {

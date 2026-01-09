@@ -14,6 +14,7 @@ const multasButtons = require('./buttons/multasButtons');
 const analistaButtons = require('./buttons/analistaButtons');
 const mediadorButtons = require('./buttons/mediadorButtons');
 const rankingButtons = require('./buttons/rankingButtons');
+const vendasButtons = require('./buttons/vendasButtons');
 
 /**
  * Processa cliques em botões
@@ -25,6 +26,11 @@ async function handleButton(interaction) {
     // Botões do painel do dono
     if (customId.startsWith('owner_')) {
       return await ownerPanelButtons.handle(interaction);
+    }
+
+    // Botões de vendas
+    if (customId.startsWith('vendas_')) {
+      return await vendasButtons.handle(interaction);
     }
 
     // Botões de ranking

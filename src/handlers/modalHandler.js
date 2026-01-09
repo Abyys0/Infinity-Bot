@@ -8,7 +8,7 @@ const blacklistModals = require('./modals/blacklist');
 const pixModals = require('./modals/pix');
 const pixPessoalModals = require('./modals/pixPessoal');
 const ticketModals = require('./modals/ticket');
-const vitoriaModals = require('./modals/vitoria');
+const vendasModals = require('./modals/vendas');
 
 /**
  * Processa envios de modais
@@ -20,6 +20,11 @@ async function handleModal(interaction) {
     // Modais do painel do dono
     if (customId.startsWith('modal_owner_')) {
       return await ownerPanelModals.handle(interaction);
+    }
+
+    // Modais de vendas
+    if (customId.startsWith('modal_vendas_')) {
+      return await vendasModals.handle(interaction);
     }
 
     // Modais de blacklist
@@ -40,11 +45,6 @@ async function handleModal(interaction) {
     // Modals de ticket
     if (customId.startsWith('modal_close_ticket_') || customId.startsWith('modal_add_member_ticket_')) {
       return await ticketModals.handle(interaction);
-    }
-
-    // Modals de vitória
-    if (customId.startsWith('modal_vitoria_')) {
-      return await vitoriaModals.handle(interaction);
     }
 
     // Modal não reconhecido

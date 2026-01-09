@@ -6,10 +6,18 @@ const { addMediador, getActiveMediadores } = require('../../services/mediadorSer
 const permissions = require('../../config/permissions');
 const db = require('../../database');
 const logger = require('../../utils/logger');
-const { COLORS, EMOJIS } = require('../../config/constants');
+const { COLORS, EMOJIS, DISABLED_FEATURES, DISABLED_MESSAGE } = require('../../config/constants');
 
 async function handle(interaction) {
   const customId = interaction.customId;
+
+  // Verificar se o painel do dono está desativado
+  if (DISABLED_FEATURES.PAINEL_DONO) {
+    return interaction.reply({
+      embeds: [createErrorEmbed('Sistema Desativado', DISABLED_MESSAGE)],
+      flags: 64
+    });
+  }
 
   // Verificar se é o dono
   if (!await permissions.isOwner(interaction.user.id, interaction.member)) {

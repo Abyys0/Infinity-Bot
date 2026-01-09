@@ -2,7 +2,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { createErrorEmbed, createSuccessEmbed } = require('../../utils/embeds');
-const { EMOJIS, COLORS, QUEUE_TYPES } = require('../../config/constants');
+const { EMOJIS, COLORS, QUEUE_TYPES, DISABLED_FEATURES, DISABLED_MESSAGE } = require('../../config/constants');
 const db = require('../../database');
 const logger = require('../../utils/logger');
 const { getActiveMediadores } = require('../../services/mediadorService');
@@ -11,6 +11,14 @@ const rankingService = require('../../services/rankingService');
 module.exports = {
   async handle(interaction) {
     const customId = interaction.customId;
+
+    // Verificar se o sistema de filas está desativado
+    if (DISABLED_FEATURES.FILAS) {
+      return interaction.reply({
+        embeds: [createErrorEmbed('Sistema Desativado', DISABLED_MESSAGE)],
+        flags: 64
+      });
+    }
 
     // entrar_fila_FILAID - Novo sistema
     if (customId.startsWith('entrar_fila_')) {

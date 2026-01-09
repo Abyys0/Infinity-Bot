@@ -3,7 +3,7 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { createErrorEmbed } = require('../utils/embeds');
 const permissions = require('../config/permissions');
-const { EMOJIS, COLORS } = require('../config/constants');
+const { EMOJIS, COLORS, DISABLED_FEATURES, DISABLED_MESSAGE } = require('../config/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,6 +17,13 @@ module.exports = {
   async execute(interaction) {
     // Defer IMEDIATAMENTE antes de qualquer operação
     await interaction.deferReply({ flags: 64 });
+
+    // Verificar se o painel de analista está desativado
+    if (DISABLED_FEATURES.PAINEL_ANALISTA) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Sistema Desativado', DISABLED_MESSAGE)]
+      });
+    }
 
     // Verificar se é mediador ou superior (sem await inline)
     const temPermissao = await permissions.isMediadorOrAbove(interaction.member);

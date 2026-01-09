@@ -1,21 +1,28 @@
 // Handler de Menus de Seleção (StringSelectMenu)
 
 const ticketMenus = require('./selectMenus/ticketMenus');
+const vendasMenus = require('./selectMenus/vendasMenus');
 const queueMenus = require('./selectMenus/queueMenus');
 
 async function handleSelectMenu(interaction) {
   try {
     const customId = interaction.customId;
 
-    // Tickets
-    if (customId.startsWith('ticket_')) {
-      await ticketMenus.handle(interaction);
+    // Vendas
+    if (customId.startsWith('vendas_select_')) {
+      await vendasMenus.handle(interaction);
       return;
     }
 
-    // Filas
-    if (customId.startsWith('fila_')) {
+    // Queue (Filas)
+    if (customId.startsWith('queue_')) {
       await queueMenus.handle(interaction);
+      return;
+    }
+
+    // Tickets
+    if (customId.startsWith('ticket_')) {
+      await ticketMenus.handle(interaction);
       return;
     }
 

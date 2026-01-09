@@ -2,7 +2,7 @@
 
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createErrorEmbed, createSuccessEmbed } = require('../utils/embeds');
-const { PLATFORMS, EMOJIS, COLORS } = require('../config/constants');
+const { PLATFORMS, EMOJIS, COLORS, DISABLED_FEATURES, DISABLED_MESSAGE } = require('../config/constants');
 const permissions = require('../config/permissions');
 const db = require('../database');
 const { temMultaPendente, getMultaPendente } = require('../services/multaService');
@@ -39,6 +39,13 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
+
+    // Verificar se o sistema de filas está desativado
+    if (DISABLED_FEATURES.FILAS) {
+      return interaction.editReply({
+        embeds: [createErrorEmbed('Sistema Desativado', DISABLED_MESSAGE)]
+      });
+    }
 
     // Verificar se há mediadores em serviço
     const { getActiveMediadores } = require('../services/mediadorService');
